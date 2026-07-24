@@ -1,0 +1,3438 @@
+<html><head>
+<title>Mendez Referrals</title>
+<meta name="apple-mobile-web-app-title" content="Mendez Referrals">
+<meta name="application-name" content="Mendez Referrals">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a2a6e">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="manifest" href="manifest.json">
+<script>
+/* ===== Standalone backend shim — replaces Google Apps Script (google.script.run)
+   with a localStorage-backed store, so this app runs as a single static file. ===== */
+(function () {
+  'use strict';
+  var DATA = {"specialties":["Allergy & Immunology","Cardiology","Colorectal Surgery","Dermatology","DME","Endocrinology","ENT (Otolaryngology)","Gastroenterology","General Surgery","Gynecology","Hematology / Oncology","Infectious Disease","Nephrology","Neurology","Nutrition & Dietetics","Oncology","Ophthalmology","Optometry","Orthopedic","Other Services","Pain Management","Physical Therapy","Plastic Surgery","Podiatry","Psychiatry","Pulmonology","Radiology","Rheumatology","Surgery","Urology"],"specialtyMap":{"Plastic Surgery":["General Plastic Surgery"],"Nephrology":["Dialysis","General Nephrology"],"Pain Management":["Chronic Pain","Interventional Pain"],"Infectious Disease":["General Infectious Disease"],"Oncology":["Medical Oncology","Radiation Oncology"],"Hematology / Oncology":["Breast Oncology","Gynecology Oncology","Hematology","Medical Oncology","Radiation Oncology"],"General Surgery":["Breast Surgery","Colorectal Surgery","General Surgery","Oral Surgery"],"Urology":["General Urology","Urogynecology"],"Podiatry":["General Podiatry"],"Surgery":["Bariatric Surgery","Pre-Operative Clearance"],"Gastroenterology":["General Gastroenterology","Hepatology"],"ENT (Otolaryngology)":["General ENT","Head & Neck Surgery"],"Ophthalmology":["General Ophthalmology","Neuro-Ophthalmology"],"Cardiology":["Cardiovascular Surgery","Electrophysiology","General Cardiology","Heart Failure","Interventional Cardiology","Thoracic Surgery"],"DME":["Diabetic Supplies","Home Medical Equipment","Hospital Equipment","Mobility Equipment","Orthopedic Bracing","Respiratory Equipment"],"Pulmonology":["General Pulmonology","Sleep Medicine"],"Dermatology":["General Dermatology","Mohs Surgery"],"Orthopedic":["General Orthopedic","Hand Surgery","Sports Medicine"],"Gynecology":["Fertility Medicine","General Gynecology","Gynecology Oncology","Urogynecology"],"Rheumatology":["General Rheumatology"],"Optometry":["General Optometry"],"Other Services":["Audiology","Home Health Services","Hospice","Sleep Study"],"Neurology":["General Neurology","Neuro-Ophthalmology","Neuropsychology","Neurosurgery"],"Colorectal Surgery":["Colorectal Surgery","Proctology"],"Nutrition & Dietetics":["Diabetes Nutrition","Eating Disorders","General Nutrition & Dietetics","Obesity & Weight Management","Oncology Nutrition","Pediatric Nutrition","Renal Nutrition"],"Physical Therapy":["Lymphedema Therapy","Occupational Therapy","Physical Therapy","Speech Therapy"],"Radiology":["Ablation","Angiography","Biopsy (Image-Guided)","Brain MRI / CT","Breast Imaging / Mammography","CT Scan (Computed Tomography)","DEXA Scan (Bone Density)","Drainage / Aspiration","Echocardiography","Embolization","Fluoroscopy","Interventional Radiology (IR)","IVC Filter Placement","Mammography","MRI (Magnetic Resonance Imaging)","Musculoskeletal Radiology (MSK)","Myelography","Nuclear Medicine","Pediatric Radiology","PET Scan","PICC Line / Port Placement","Spine Imaging","Stenting / Angioplasty","Thrombolysis","Ultrasound","Vertebroplasty / Kyphoplasty","X-Ray"],"Allergy & Immunology":["Allergic Rhinitis","Asthma","Contact Dermatitis","Drug Allergy","Eczema / Atopic Dermatitis","Food Allergy","General Allergy & Immunology","Immunodeficiency","Insect Venom Allergy","Sinusitis / Chronic Rhinosinusitis","Urticaria / Angioedema"],"Psychiatry":["General Psychiatry","Neuropsychology","Psychology"],"Endocrinology":["Diabetes Management","General Endocrinology","Hormone Disorders","Obesity Management","Osteoporosis","Thyroid Disorders"]},"statusList":["Pending","In Progress","Completed"],"success":true,"insuranceTypes":["Medicare","Medicaid","Marketplace","PPO/Commercial","Self-Pay"],"employees":["Eduardo Sandez","Ercilia Mendoza","Lilian Perdomo"],"statusColors":{"Completed":"#ffffff","In Progress":"#00ffff","Pending":"#ff9900"},"agingThresholdDays":7,"plansMap":{"PPO/Commercial":["Aetna","Avmed","Blue Cross Blue Shield","Champva","Cigna","Curative","First Health","Golden Rule","Humana","Image 360","Memorial Healthcare","Multiplan","The Lommis Company","Tourmed","United and UMR","Wellpoint"],"Marketplace":["Cigna","Molina","Oscar"],"Self-Pay":["Membership","Self-Pay"],"Medicare":["Aetna Medicare","BCBS Medicare PPO","Preferred Care Partners","Simply Medicare","Solis Healthcare","Straight Medicare","United Medicare PPO"],"Medicaid":["Straight Medicaid","Simply","South Florida Community"]},"providers":["Aidee Fabre","Americo Hajaz","Juan Villarroel","Lecia Villames","Leopold Chery","Luis Arocha Yiong","Macmelsie Marrero","Marie Vales-Preval","Oscar Mendez","Victor Francisco"]};
+  var LSK = 'ref_referrals_v1';
+  function load() { try { return JSON.parse(localStorage.getItem(LSK) || '[]'); } catch (e) { return []; } }
+  function save(rows) { try { localStorage.setItem(LSK, JSON.stringify(rows)); } catch (e) {} }
+  function uid() { return 'R' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function todayIso() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function clockStr() { return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  function forDate(dateIso, employee) {
+    return load().filter(function (r) { return r.dateIso === dateIso && (!employee || r.submittedBy === employee); });
+  }
+
+  var API = {
+    getReferralOptions: function () { var o = { success: true }; for (var k in DATA) o[k] = DATA[k]; return o; },
+
+    getReferralsForDate: function (dateIso, employee) {
+      return { success: true, referrals: forDate(dateIso, employee) };
+    },
+
+    getReferralDashboard: function (dateIso, employee) {
+      var rows = forDate(dateIso, employee), pts = {}, o = { submitted: rows.length, totalReferrals: rows.length, totalPatients: 0, pending: 0, inProgress: 0, completed: 0 };
+      rows.forEach(function (r) {
+        pts[(r.patientName || '').toUpperCase()] = 1;
+        if (r.status === 'Pending') o.pending++;
+        else if (r.status === 'In Progress') o.inProgress++;
+        else if (r.status === 'Completed') o.completed++;
+      });
+      o.totalPatients = Object.keys(pts).length;
+      return { success: true, date: dateIso, isToday: (dateIso === todayIso()), overall: o, byEmployee: {}, aging: [] };
+    },
+
+    addReferral: function (p) {
+      var rows = load(), now = Date.now(), t = clockStr(), di = todayIso(), pid = uid(), refs = p.referrals || [];
+      refs.forEach(function (rr, i) {
+        var isParent = (i === 0);
+        rows.push({
+          id: isParent ? pid : (pid + '_C' + i), parentId: isParent ? '' : pid, isParent: isParent,
+          refCount: isParent ? refs.length : null, dateIso: di, date: '', time: t,
+          submittedBy: p.submittedBy || '', patientName: p.patientName || '', dob: '', dobIso: p.dobIso || '',
+          groupHome: !!p.groupHome, insuranceType: p.insuranceType || '', insurancePlan: p.insurancePlan || '',
+          provider: p.provider || '', specialty: rr.specialty || '', subspecialty: rr.subspecialty || '',
+          status: rr.status || 'Pending', notes: rr.notes || '', lastUpdated: '', updatedBy: p.submittedBy || '',
+          submittedAtMs: now, completedAtMs: (rr.status === 'Completed') ? now : 0
+        });
+      });
+      save(rows);
+      return { success: true };
+    },
+
+    updateReferral: function (p) {
+      var rows = load(), r = rows.filter(function (x) { return x.id === p.id; })[0];
+      if (!r) return { success: false, error: 'Referral not found' };
+      var f = p.fields || {};
+      for (var k in f) r[k] = f[k];
+      if ('status' in f) { if (f.status === 'Completed') { if (!r.completedAtMs) r.completedAtMs = Date.now(); } else r.completedAtMs = 0; }
+      if (p.updatedBy) r.updatedBy = p.updatedBy;
+      save(rows);
+      return { success: true };
+    },
+
+    deleteReferral: function (id, employee, scope) {
+      var rows = load(), r = rows.filter(function (x) { return x.id === id; })[0];
+      if (!r) { return { success: true }; }
+      var groupId = r.isParent ? r.id : r.parentId;
+      if (scope === 'all' && groupId) {
+        rows = rows.filter(function (x) { return !(x.id === groupId || x.parentId === groupId); });
+      } else {
+        rows = rows.filter(function (x) { return x.id !== id; });
+        if (groupId) {
+          var grp = rows.filter(function (x) { return x.id === groupId || x.parentId === groupId; });
+          if (grp.length) {
+            var parent = grp.filter(function (x) { return x.isParent; })[0] || grp[0];
+            grp.forEach(function (x) {
+              if (x === parent) { x.isParent = true; x.parentId = ''; x.refCount = grp.length; }
+              else { x.isParent = false; x.parentId = parent.id; x.refCount = null; }
+            });
+          }
+        }
+      }
+      save(rows);
+      return { success: true };
+    },
+
+    searchPatients: function (q) {
+      q = (q || '').toLowerCase();
+      var rows = load(), seen = {}, out = [];
+      for (var i = rows.length - 1; i >= 0 && out.length < 6; i--) {
+        var r = rows[i], nm = r.patientName || '';
+        if (!nm || nm.toLowerCase().indexOf(q) === -1) continue;
+        var key = nm.toUpperCase();
+        if (seen[key]) continue; seen[key] = 1;
+        out.push({ name: nm, insuranceType: r.insuranceType, insurancePlan: r.insurancePlan, groupHome: r.groupHome, lastProvider: r.provider, lastSpecialty: r.specialty, lastVisitIso: r.dateIso });
+      }
+      return { success: true, results: out };
+    }
+  };
+
+  function makeRunner() {
+    var succ = null, fail = null;
+    var runner = {
+      withSuccessHandler: function (fn) { succ = fn; return runner; },
+      withFailureHandler: function (fn) { fail = fn; return runner; }
+    };
+    Object.keys(API).forEach(function (m) {
+      runner[m] = function () {
+        var s = succ, f = fail, args = arguments;
+        setTimeout(function () {
+          try { var res = API[m].apply(null, args); if (s) s(res); }
+          catch (e) { if (f) f(String(e && e.message || e)); }
+        }, 25);
+        return runner;
+      };
+    });
+    return runner;
+  }
+  window.google = { script: { get run() { return makeRunner(); }, host: { close: function () {} } } };
+})();
+</script>
+
+
+
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+   
+
+  :root {
+    --m-blue: #0a2a6e;
+    --m-blue-dark: #061a4a;
+    --m-blue-light: #2c5cc7;
+    --m-gold: #f5a821;
+    --m-gold-light: #f7c45a;
+
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --panel-2: #f9faff;
+    --border: #e5ebf6;
+    --border-strong: #cdd5e8;
+
+    --text-1: #0f1d40;
+    --text-2: #4a5577;
+    --text-muted: #8a92a8;
+
+    --shadow-sm: 0 1px 2px rgba(15, 29, 64, 0.04);
+    --shadow-md: 0 4px 14px rgba(15, 29, 64, 0.06);
+    --shadow-lg: 0 8px 28px rgba(15, 29, 64, 0.08);
+
+    --radius: 14px;
+    --radius-sm: 8px;
+
+    --status-pending: #ff9900;
+    --status-in-progress: #00ffff;
+    --status-completed: #ffffff;
+
+    --emp-eduardo: #2563eb;
+    --emp-lilian: #7c3aed;
+    --emp-ercilia: #0e9f6e;
+
+    --c-aging: #dc2626;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font-family: inherit; cursor: pointer; border: 0; }
+  .hidden { display: none !important; }
+
+  .ref-app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+   
+  .ref-sidebar {
+    background: var(--m-blue);
+    border-right: 1px solid var(--m-blue-dark);
+    display: flex;
+    flex-direction: column;
+    padding: 22px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .ref-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 8px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 14px;
+  }
+
+  .ref-brand-logo {
+    width: 100%;
+    max-width: 180px;
+    height: auto;
+    object-fit: contain;
+    display: block;
+  }
+
+  .ref-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ref-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    background: transparent;
+    border-radius: 10px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.78);
+    text-align: left;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .ref-nav-item:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+
+  .ref-nav-item.is-active {
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+  }
+
+  .ref-sidebar-footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+
+  .ref-version {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+
+   
+  .ref-main {
+    padding: 28px 32px;
+    min-width: 0;
+  }
+
+   
+  .ref-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, var(--m-blue) 0%, var(--m-blue-dark) 100%);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 22px rgba(10,42,110,0.22);
+    border-top: 5px solid var(--m-gold);
+    color: #fff;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .ref-header-greeting {
+    min-width: 0;
+    line-height: 1.15;
+  }
+
+  .ref-greet-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 4px;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  .ref-greet-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .ref-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+   
+  .ref-employee-select {
+    position: relative;
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+
+  .ref-employee-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 32px 8px 14px;
+    background: #ffffff;
+    border: 1px solid #ffffff;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--m-blue);
+    font-family: inherit;
+    transition: box-shadow 0.12s;
+    position: relative;
+  }
+
+  .ref-employee-btn:hover,
+  .ref-employee-btn:active {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  }
+
+  .ref-employee-btn .ref-employee-label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--m-blue);
+  }
+
+  .ref-employee-btn .ref-employee-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--m-blue);
+    white-space: nowrap;
+  }
+
+  .ref-employee-btn .ref-employee-caret {
+    position: absolute;
+    right: 10px;
+    color: var(--m-blue);
+    pointer-events: none;
+    transition: transform 0.15s;
+  }
+
+  .ref-employee-btn[aria-expanded="true"] .ref-employee-caret {
+    transform: rotate(180deg);
+  }
+
+  .ref-employee-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 100%;
+    max-width: 280px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(15, 29, 64, 0.18);
+    z-index: 500;
+    padding: 6px;
+    overflow: hidden;
+  }
+
+  .ref-employee-option {
+    display: block;
+    width: 100%;
+    padding: 9px 14px;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--m-blue);
+    border-radius: 7px;
+    transition: background 0.1s;
+  }
+
+  .ref-employee-option:hover {
+    background: rgba(31, 76, 199, 0.08);
+  }
+
+  .ref-employee-option.selected {
+    background: var(--m-blue);
+    color: #fff;
+  }
+
+  .ref-employee-option.selected:hover {
+    background: var(--m-blue-dark);
+  }
+
+  .ref-date-picker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid #fff;
+    border-radius: 10px;
+    color: var(--m-blue);
+    cursor: pointer;
+    transition: filter 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+
+  .ref-date-picker:hover {
+    filter: brightness(0.97);
+    box-shadow: 0 4px 12px rgba(10,42,110,0.25);
+  }
+
+  .ref-date-picker svg { color: var(--m-blue); }
+
+  .ref-date-picker input[type="date"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    color: transparent;
+  }
+
+  .ref-date-picker input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .ref-date-display {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--m-blue);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+   
+  .ref-time-block {
+    text-align: right;
+    line-height: 1.2;
+    padding-left: 4px;
+  }
+
+  .ref-time-now {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ref-time-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    font-weight: 500;
+  }
+
+  .ref-time-live span {
+    color: rgba(255,255,255,0.65);
+    font-weight: 500;
+  }
+
+  .ref-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+    animation: refLivePulse 1.6s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes refLivePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
+
+   
+  .ref-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 22px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    border-top: 4px solid var(--m-blue);
+  }
+
+  .ref-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .ref-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--m-blue);
+    margin: 0;
+    letter-spacing: -0.2px;
+  }
+
+  .ref-section-title svg { color: var(--m-blue); }
+
+  .ref-section-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ref-section-inner { padding: 22px; }
+
+  .ref-section-foot {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 12px 22px;
+    background: var(--panel-2);
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+
+  .ref-foot-pill {
+    font-weight: 600;
+    color: var(--text-2);
+  }
+
+  .ref-foot-pill strong {
+    color: var(--m-blue);
+    font-weight: 800;
+    margin-right: 3px;
+  }
+
+  .ref-foot-pending strong { color: #b35900; }
+  .ref-foot-progress strong { color: #0e7490; }
+  .ref-foot-completed strong { color: #047857; }
+
+  .ref-foot-divider {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    background: var(--border-strong);
+  }
+
+  .ref-foot-text-light {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-left: auto;
+  }
+
+  .ref-foot-text-light span {
+    color: var(--m-blue);
+    font-weight: 700;
+  }
+
+  .ref-foot-text { font-weight: 600; }
+  .ref-foot-text span { color: var(--m-blue); }
+
+   
+  .ref-overall-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+
+  .ref-stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+    border-top: 4px solid var(--m-blue);
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .ref-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .ref-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    background: rgba(31,76,199,0.1);
+    color: var(--m-blue);
+  }
+
+  .ref-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--text-2);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .ref-stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text-1);
+    line-height: 1.05;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+
+  .ref-stat-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .ref-stat-card.is-pending { border-top-color: var(--status-pending); }
+  .ref-stat-card.is-pending .ref-stat-icon {
+    background: rgba(255,153,0,0.12);
+    color: #b35900;
+  }
+
+  .ref-stat-card.is-progress { border-top-color: #06b6d4; }
+  .ref-stat-card.is-progress .ref-stat-icon {
+    background: rgba(6,182,212,0.12);
+    color: #0e7490;
+  }
+
+  .ref-stat-card.is-completed { border-top-color: var(--emp-ercilia); }
+  .ref-stat-card.is-completed .ref-stat-icon {
+    background: rgba(14,159,110,0.12);
+    color: #047857;
+  }
+
+  .ref-stat-card.is-patients { border-top-color: var(--emp-eduardo); }
+  .ref-stat-card.is-patients .ref-stat-icon {
+    background: rgba(37,99,235,0.12);
+    color: var(--emp-eduardo);
+  }
+
+  .ref-stat-card.is-total { border-top-color: var(--emp-lilian); }
+  .ref-stat-card.is-total .ref-stat-icon {
+    background: rgba(124,58,237,0.12);
+    color: var(--emp-lilian);
+  }
+
+   
+  .ref-emp-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .ref-emp-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 18px 20px;
+    border-top: 5px solid var(--m-blue);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .ref-emp-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .ref-emp-card.is-eduardo { border-top-color: var(--emp-eduardo); }
+  .ref-emp-card.is-lilian { border-top-color: var(--emp-lilian); }
+  .ref-emp-card.is-ercilia { border-top-color: var(--emp-ercilia); }
+
+  .ref-emp-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-1);
+    margin: 0 0 14px;
+    letter-spacing: -0.2px;
+  }
+
+  .ref-emp-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .ref-emp-stat {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .ref-emp-stat-val {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--m-blue);
+    margin-bottom: 4px;
+  }
+
+  .ref-emp-stat-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .ref-emp-totals {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: var(--text-2);
+  }
+
+  .ref-emp-totals strong {
+    color: var(--m-blue);
+    font-weight: 800;
+  }
+
+   
+  .ref-aging-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ref-aging-row:last-child { border-bottom: 0; }
+
+  .ref-aging-days {
+    flex-shrink: 0;
+    background: rgba(220,38,38,0.1);
+    color: var(--c-aging);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 13px;
+    min-width: 70px;
+    text-align: center;
+  }
+
+  .ref-aging-name {
+    flex: 1;
+    font-weight: 700;
+    color: var(--text-1);
+  }
+
+  .ref-aging-meta {
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .ref-aging-status { flex-shrink: 0; }
+
+   
+  .ref-table-wrap { overflow-x: auto; }
+
+  .ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: auto;
+  }
+
+  .ref-table thead th {
+    padding: 10px 10px;
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+
+  .ref-table tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    text-align: center;
+  }
+
+  .ref-table tbody tr:last-child td { border-bottom: 0; }
+
+  .ref-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .ref-table tbody tr:hover { background: var(--panel-2); }
+
+  .ref-table tbody tr.is-clone { background: rgba(31,76,199,0.03); }
+  .ref-table tbody tr.is-clone:hover { background: rgba(31,76,199,0.06); }
+
+  .ref-table tbody tr.is-pending-save {
+    opacity: 0.6;
+    animation: ref-pulse-save 1.2s ease-in-out infinite;
+  }
+
+  .ref-table tbody tr.is-pending-save:hover { background: transparent; }
+
+  @keyframes ref-pulse-save {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.85; }
+  }
+
+  .ref-td-time {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-2);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .ref-td-name {
+    font-weight: 600;
+    color: var(--text-1);
+    min-width: 200px;
+    white-space: nowrap;
+  }
+
+  .ref-clone-indent {
+    display: inline-block;
+    color: var(--text-muted);
+    margin-right: 6px;
+    font-weight: 400;
+  }
+
+  .ref-th-action { text-align: right !important; }
+
+  .ref-td-action {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+   
+  .ref-th-num,
+  .ref-td-num {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    text-align: center !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+
+  .ref-num-chip {
+    font-weight: normal;
+    color: inherit;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    display: inline;
+    font-variant-numeric: tabular-nums;
+  }
+
+   
+  .ref-td-wait { white-space: nowrap; }
+
+  .ref-wait-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #e8f7ef;
+    color: #047857;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1;
+    white-space: nowrap;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ref-wait-pending,
+  .ref-wait-progress,
+  .ref-wait-done {
+    background: #e8f7ef;
+    color: #047857;
+  }
+
+   
+  .ref-count-chip,
+  .ref-ref-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    background: rgba(10, 42, 110, 0.08);
+    color: var(--m-blue);
+    border: 1px solid rgba(10, 42, 110, 0.12);
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0;
+    box-shadow: none;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  .ref-gh-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(124,58,237,0.12);
+    color: var(--emp-lilian);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+   
+  .ref-status-pill,
+  .ref-status-badge,
+  .ref-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-width: 112px;
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 0;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: none;
+    box-shadow: none;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  .ref-status-pill::before,
+  .ref-status-badge::before,
+  .ref-status::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  .ref-status-pending,
+  .ref-status-pill.ref-status-pending,
+  .ref-status-badge.status-pending,
+  .ref-status.status-pending,
+  .ref-status-badge.is-pending,
+  .ref-status.is-pending {
+    background: #f5a821;
+    color: #ffffff;
+  }
+
+  .ref-status-progress,
+  .ref-status-in-progress,
+  .ref-status-pill.ref-status-progress,
+  .ref-status-pill.ref-status-in-progress,
+  .ref-status-badge.status-in-progress,
+  .ref-status.status-in-progress,
+  .ref-status-badge.is-in-progress,
+  .ref-status.is-in-progress {
+    background: #1f4cc7;
+    color: #ffffff;
+  }
+
+  .ref-status-completed,
+  .ref-status-pill.ref-status-completed,
+  .ref-status-badge.status-completed,
+  .ref-status.status-completed,
+  .ref-status-badge.is-completed,
+  .ref-status.is-completed {
+    background: #10b981;
+    color: #ffffff;
+  }
+
+  .ref-empty {
+    text-align: center !important;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 40px 20px !important;
+  }
+
+  .ref-empty-mini {
+    grid-column: 1 / -1;
+    padding: 30px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .ref-error {
+    color: #c0392b;
+    font-style: normal;
+  }
+
+   
+  .ref-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .ref-search svg {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .ref-search input {
+    padding: 9px 12px 9px 38px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--text-1);
+    width: 240px;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .ref-search input:focus {
+    border-color: var(--m-blue-light);
+    background: #fff;
+  }
+
+  .ref-btn {
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    font-family: inherit;
+    line-height: 1;
+  }
+
+  .ref-btn-primary {
+    background: var(--m-blue);
+    color: #fff;
+  }
+
+  .ref-btn-primary:hover {
+    background: var(--m-blue-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .ref-btn-secondary {
+    background: var(--panel-2);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+  }
+
+  .ref-btn-secondary:hover {
+    background: #f0f3fb;
+    color: var(--text-1);
+  }
+
+  .ref-btn-danger {
+    background: #dc2626;
+    color: #fff;
+  }
+
+  .ref-btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220,38,38,0.3);
+  }
+
+  .ref-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .ref-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    margin-left: 2px;
+    font-family: inherit;
+  }
+
+  .ref-icon-btn:hover {
+    background: rgba(31,76,199,0.1);
+    color: var(--m-blue);
+  }
+
+  .ref-icon-btn.is-danger:hover {
+    background: rgba(220,38,38,0.1);
+    color: #b91c1c;
+  }
+
+   
+  .ref-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    min-width: 34px;
+    padding: 0 14px;
+    margin-left: 4px;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    white-space: nowrap;
+  }
+
+  .ref-action-btn:hover {
+    background: var(--panel-2);
+    color: var(--m-blue);
+    border-color: var(--m-blue-light);
+  }
+
+  .ref-action-btn.is-primary {
+    background: var(--m-blue);
+    border-color: var(--m-blue);
+    color: #fff;
+  }
+
+  .ref-action-btn.is-primary:hover {
+    background: var(--m-blue-dark);
+    border-color: var(--m-blue-dark);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(10, 42, 110, 0.25);
+  }
+
+  .ref-action-btn.ref-back-btn {
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+    color: var(--text-2);
+  }
+
+  .ref-action-btn.ref-back-btn:hover {
+    color: var(--m-blue);
+  }
+
+  .ref-action-btn.ref-back-btn svg { display: block; }
+
+   
+  .ref-dashboard-page,
+  .ref-daily-page { display: none; }
+
+  body.view-dashboard .ref-dashboard-page { display: block; }
+  body.view-daily .ref-daily-page { display: block; }
+
+   
+  body.view-fullscreen .ref-sidebar { display: none; }
+  body.view-fullscreen .ref-app { grid-template-columns: 1fr; }
+  body.view-fullscreen .ref-main { padding: 16px 24px; }
+
+   
+  .ref-refresh-icon { transition: transform 0.3s; }
+  .ref-refresh-icon.spinning { animation: ref-spin 1s linear infinite; }
+
+  @keyframes ref-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+   
+  #refFullscreenBtn .ref-icon-collapse { display: none; }
+  body.view-fullscreen #refFullscreenBtn .ref-icon-expand { display: none; }
+  body.view-fullscreen #refFullscreenBtn .ref-icon-collapse { display: block; }
+
+   
+  .ref-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,29,64,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .ref-modal-overlay.hidden { display: none; }
+
+  .ref-modal {
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 720px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ref-modal-narrow { max-width: 460px; }
+
+  .ref-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ref-modal-head h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--m-blue-dark);
+  }
+
+  .ref-modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 22px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .ref-modal-close:hover {
+    background: var(--panel-2);
+    color: var(--text-1);
+  }
+
+  .ref-modal-body {
+    padding: 20px 22px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .ref-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+
+  .ref-modal-foot-stack { flex-wrap: nowrap; }
+
+  .ref-modal-foot-stack .ref-btn {
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+
+   
+  .ref-btn-danger.ref-btn-outline {
+    background: #fff;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    box-shadow: none;
+  }
+
+  .ref-btn-danger.ref-btn-outline:hover {
+    background: #fef2f2;
+    color: #991b1b;
+    border-color: #fca5a5;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(220,38,38,0.12);
+  }
+
+   
+  .ref-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .ref-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ref-field-wide { grid-column: 1 / -1; }
+
+  .ref-field span.ref-field-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .ref-field input[type="text"],
+  .ref-field input[type="tel"],
+  .ref-field input[type="date"],
+  .ref-field input[type="number"],
+  .ref-field select,
+  .ref-field textarea {
+    padding: 9px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-1);
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .ref-field input:focus,
+  .ref-field select:focus,
+  .ref-field textarea:focus {
+    border-color: var(--m-blue-light);
+    background: #fff;
+  }
+
+  .ref-field select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23667085' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+    cursor: pointer;
+  }
+
+  .ref-field textarea {
+    resize: vertical;
+    min-height: 70px;
+  }
+
+  .ref-checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 0.15s;
+  }
+
+  .ref-checkbox-field:hover {
+    border-color: var(--m-blue-light);
+  }
+
+  .ref-checkbox-field input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--m-blue);
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .ref-checkbox-field-text {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+
+  .ref-suggestions { position: relative; }
+
+  .ref-suggestions-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+  }
+
+  .ref-suggestions-list.is-open { display: block; }
+
+  .ref-suggestion-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  .ref-suggestion-item:last-child { border-bottom: 0; }
+
+  .ref-suggestion-item:hover { background: var(--panel-2); }
+
+  .ref-suggestion-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-1);
+    margin-bottom: 2px;
+  }
+
+  .ref-suggestion-meta {
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .ref-patient-chip {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: rgba(245,168,33,0.1);
+    border: 1px solid rgba(245,168,33,0.3);
+    border-radius: 8px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    line-height: 1.4;
+    display: none;
+  }
+
+  .ref-patient-chip.is-visible { display: block; }
+  .ref-patient-chip strong { color: var(--m-blue); }
+
+  .ref-multi-block {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .ref-multi-head {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--m-blue);
+    margin-bottom: 12px;
+    letter-spacing: -0.1px;
+  }
+
+  .ref-multi-row {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  .ref-multi-row-head {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .ref-multi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .ref-delete-summary {
+    padding: 14px 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  .ref-delete-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-1);
+    margin-bottom: 3px;
+  }
+
+  .ref-delete-meta {
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .ref-delete-warning {
+    margin: 14px 2px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-2);
+  }
+
+   
+  .ref-alert-modal .ref-modal-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px;
+  }
+
+  .ref-alert-icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(31, 76, 199, 0.12);
+    color: var(--m-blue);
+  }
+
+  .ref-alert-icon.is-info {
+    background: rgba(31, 76, 199, 0.12);
+    color: var(--m-blue);
+  }
+
+  .ref-alert-icon.is-warning {
+    background: rgba(245, 168, 33, 0.18);
+    color: #b35900;
+  }
+
+  .ref-alert-icon.is-error {
+    background: rgba(220, 38, 38, 0.14);
+    color: #b91c1c;
+  }
+
+  .ref-alert-icon.is-success {
+    background: rgba(14, 159, 110, 0.14);
+    color: #047857;
+  }
+
+  .ref-alert-message {
+    margin: 6px 0 0;
+    padding: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-1);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    flex: 1;
+    min-width: 0;
+  }
+
+   
+  @media (max-width: 1280px) {
+    .ref-overall-row { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (max-width: 1100px) {
+    .ref-emp-row { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 980px) {
+    .ref-app { grid-template-columns: 1fr; }
+
+    .ref-sidebar {
+      position: relative;
+      height: auto;
+      padding: 14px 16px;
+    }
+
+    .ref-brand {
+      padding-bottom: 14px;
+      margin-bottom: 10px;
+    }
+
+    .ref-nav {
+      flex-direction: row;
+      overflow-x: auto;
+    }
+
+    .ref-nav-item { white-space: nowrap; }
+
+    .ref-sidebar-footer { display: none; }
+
+    .ref-main { padding: 22px 18px; }
+
+    .ref-overall-row { grid-template-columns: repeat(2, 1fr); }
+
+    .ref-time-block { display: none; }
+
+    .ref-header { flex-wrap: wrap; }
+
+    .ref-section-inner { padding: 16px; }
+  }
+
+  @media (max-width: 640px) {
+    .ref-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+    }
+
+    .ref-header-controls { flex-wrap: wrap; }
+
+    .ref-overall-row { grid-template-columns: 1fr; }
+
+    .ref-search input { width: 100%; }
+
+    .ref-greet-title { font-size: 20px; }
+
+    .ref-form-grid { grid-template-columns: 1fr; }
+
+    .ref-multi-grid { grid-template-columns: 1fr; }
+  }
+
+   
+
+  .ref-wait-cell,
+  .ref-status-pill,
+  .ref-status-badge,
+  .ref-status,
+  .ref-count-chip,
+  .ref-ref-count,
+  .ref-action-btn,
+  .ref-icon-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    height: 34px !important;
+    min-height: 34px !important;
+
+    border-radius: 10px !important;
+
+    font-family: inherit !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+
+    white-space: nowrap !important;
+    box-shadow: none !important;
+  }
+
+  .ref-wait-cell {
+    min-width: 74px !important;
+    padding: 0 14px !important;
+    background: #e8f7ef !important;
+    color: #047857 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums !important;
+    border: 0 !important;
+  }
+
+  .ref-status-pill,
+  .ref-status-badge,
+  .ref-status {
+    min-width: 112px !important;
+    padding: 0 16px !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    text-transform: none !important;
+    border: 0 !important;
+    gap: 0 !important;
+  }
+
+  .ref-status-pill::before,
+  .ref-status-badge::before,
+  .ref-status::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  .ref-status-completed,
+  .ref-status-pill.ref-status-completed,
+  .ref-status-badge.status-completed,
+  .ref-status.status-completed,
+  .ref-status-badge.is-completed,
+  .ref-status.is-completed {
+    background: #10b981 !important;
+    color: #ffffff !important;
+  }
+
+  .ref-status-pending,
+  .ref-status-pill.ref-status-pending,
+  .ref-status-badge.status-pending,
+  .ref-status.status-pending,
+  .ref-status-badge.is-pending,
+  .ref-status.is-pending {
+    background: #f5a821 !important;
+    color: #ffffff !important;
+  }
+
+  .ref-status-progress,
+  .ref-status-in-progress,
+  .ref-status-pill.ref-status-progress,
+  .ref-status-pill.ref-status-in-progress,
+  .ref-status-badge.status-in-progress,
+  .ref-status.status-in-progress,
+  .ref-status-badge.is-in-progress,
+  .ref-status.is-in-progress {
+    background: #1f4cc7 !important;
+    color: #ffffff !important;
+  }
+
+  .ref-count-chip,
+  .ref-ref-count {
+    min-width: 34px !important;
+    padding: 0 10px !important;
+    background: rgba(10, 42, 110, 0.08) !important;
+    color: #0a2a6e !important;
+    border: 1px solid rgba(10, 42, 110, 0.12) !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+  }
+
+  .ref-action-btn,
+  .ref-icon-btn {
+    border-radius: 10px !important;
+  }
+
+  .ref-table tbody td {
+    vertical-align: middle !important;
+  }
+
+</style></head>
+<body class="view-dashboard">
+
+  <div class="ref-app">
+
+    
+    <aside class="ref-sidebar">
+      <div class="ref-brand">
+        <img class="ref-brand-logo" src="logo.png" alt="Mendez Medical Center">
+      </div>
+
+      <nav class="ref-nav">
+        <button class="ref-nav-item is-active" data-section="dashboard">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <rect x="13" y="3" width="8" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <rect x="13" y="10" width="8" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+            <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+          </svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="ref-nav-item" data-section="daily">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M5 4 H17 L19 6 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+            <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            <line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+          </svg>
+          <span>Daily Log</span>
+        </button>
+      </nav>
+
+      <div class="ref-sidebar-footer">
+        <div class="ref-version">Referrals v1.7</div>
+      </div>
+    </aside>
+
+    
+    <main class="ref-main">
+
+      <header class="ref-header">
+        <div class="ref-header-greeting">
+          <h1 class="ref-greet-title">Referrals Dashboard</h1>
+          <p class="ref-greet-sub" id="refGreetSub">Showing referrals submitted by Eduardo Sandez.</p>
+        </div>
+        <div class="ref-header-controls">
+          <div class="ref-employee-select" id="refEmployeeWrap">
+            <button type="button" class="ref-employee-btn" id="refEmployeeBtn" aria-haspopup="listbox" aria-expanded="false">
+              <span class="ref-employee-label">EMPLOYEE:</span>
+              <span class="ref-employee-value" id="refEmployeeValue">Eduardo Sandez</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" class="ref-employee-caret" aria-hidden="true">
+                <path d="M6 9 L12 15 L18 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+            <div class="ref-employee-menu hidden" id="refEmployeeMenu" role="listbox" aria-labelledby="refEmployeeBtn"><button type="button" class="ref-employee-option selected" data-employee="Eduardo Sandez">Eduardo Sandez</button><button type="button" class="ref-employee-option" data-employee="Ercilia Mendoza">Ercilia Mendoza</button><button type="button" class="ref-employee-option" data-employee="Lilian Perdomo">Lilian Perdomo</button></div>
+          </div>
+          <label class="ref-date-picker" for="refDateInput">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"></line>
+              <line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+              <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+            </svg>
+            <span id="refDateDisplay" class="ref-date-display">July 24, 2026</span>
+            <input id="refDateInput" type="date">
+          </label>
+          <div class="ref-time-block">
+            <div class="ref-time-now" id="refTimeNow">11:38 AM</div>
+            <div class="ref-time-live">
+              <span class="ref-live-dot"></span>
+              Live · updated <span id="refTimeUpdated">11:38 AM</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      
+      <section class="ref-dashboard-page">
+
+        <section class="ref-section">
+          <div class="ref-section-head">
+            <h2 class="ref-section-title">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+                <rect x="13" y="3" width="8" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+                <rect x="13" y="10" width="8" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+                <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
+              </svg>
+              <span>Overview</span>
+            </h2>
+          </div>
+
+          <div class="ref-section-inner">
+            <div class="ref-overall-row">
+              <div class="ref-stat-card is-pending">
+                <div class="ref-stat-icon">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                    <path d="M12 7 V12 L15 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </div>
+                <div class="ref-stat-label">PENDING</div>
+                <div class="ref-stat-value" id="refSumPending">0</div>
+                <div class="ref-stat-sub">Awaiting action</div>
+              </div>
+
+              <div class="ref-stat-card is-progress">
+                <div class="ref-stat-icon">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                    <path d="M3 12 H6 M18 12 H21 M5.6 5.6 L7.7 7.7 M16.3 16.3 L18.4 18.4 M5.6 18.4 L7.7 16.3 M16.3 7.7 L18.4 5.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                    <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                  </svg>
+                </div>
+                <div class="ref-stat-label">IN PROGRESS</div>
+                <div class="ref-stat-value" id="refSumProgress">0</div>
+                <div class="ref-stat-sub">Working on it</div>
+              </div>
+
+              <div class="ref-stat-card is-completed">
+                <div class="ref-stat-icon">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                    <path d="M8 12 L11 15 L16 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </div>
+                <div class="ref-stat-label">COMPLETED</div>
+                <div class="ref-stat-value" id="refSumCompleted">13</div>
+                <div class="ref-stat-sub">Done today</div>
+              </div>
+
+              <div class="ref-stat-card is-patients">
+                <div class="ref-stat-icon">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                    <path d="M5 21 C5 16, 8 14, 12 14 C16 14, 19 16, 19 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  </svg>
+                </div>
+                <div class="ref-stat-label">PATIENTS</div>
+                <div class="ref-stat-value" id="refSumPatients">13</div>
+                <div class="ref-stat-sub">Unique patients</div>
+              </div>
+
+              <div class="ref-stat-card is-total">
+                <div class="ref-stat-icon">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                    <path d="M5 4 H15 L19 8 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                    <path d="M15 4 V8 H19" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                    <line x1="9" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                    <line x1="9" y1="16" x2="15" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                  </svg>
+                </div>
+                <div class="ref-stat-label">TOTAL REFERRALS</div>
+                <div class="ref-stat-value" id="refSumTotal">13</div>
+                <div class="ref-stat-sub">Today's volume</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="ref-section">
+          <div class="ref-section-head">
+            <h2 class="ref-section-title">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <path d="M5 4 H17 L19 6 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+              </svg>
+              <span>Daily Log</span>
+            </h2>
+            <div class="ref-section-controls">
+              <button class="ref-btn ref-btn-secondary" id="refPrintBtnDashboard" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M7 9 V4 H17 V9 M7 19 H5 V12 H19 V19 H17 M7 14 H17 V21 H7 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                </svg>
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+          <div class="ref-table-wrap">
+            <table class="ref-table">
+              <thead>
+                <tr>
+                  <th class="ref-th-num">#</th>
+                  <th>TIME</th>
+                  <th>WAIT</th>
+                  <th>BY</th>
+                  <th># REF</th>
+                  <th>PATIENT</th>
+                  <th>GH</th>
+                  <th>INSURANCE</th>
+                  <th>PROVIDER</th>
+                  <th>SPECIALTY</th>
+                  <th>SUBSPECIALTY</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="refDashTableBody"><tr class=""><td class="ref-td-num"><span class="ref-num-chip">13</span></td><td class="ref-td-time">11:20 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">FORERO, ALLISON ,</td><td><span style="color:var(--text-muted)">—</span></td><td>PPO/Commercial · Blue Cross Blue Shield</td><td>Americo Hajaz</td><td>Optometry</td><td>General Optometry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">12</span></td><td class="ref-td-time">11:14 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">CARDONA, OFELIA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Luis Arocha Yiong</td><td>Neurology</td><td>General Neurology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">11</span></td><td class="ref-td-time">11:04 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">GALLEGO, CARMENZA</td><td><span style="color:var(--text-muted)">—</span></td><td>PPO/Commercial · Aetna</td><td>Macmelsie Marrero</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">10</span></td><td class="ref-td-time">11:00 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">VASQUEZ, MARIANELLY</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Preferred Care Partners</td><td>Americo Hajaz</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">9</span></td><td class="ref-td-time">10:57 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">REID, MORRIE</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicaid · South Florida Community</td><td>Macmelsie Marrero</td><td>Ophthalmology</td><td>General Ophthalmology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">8</span></td><td class="ref-td-time">10:26 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">DAVIS, JACQUELINE S</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Americo Hajaz</td><td>Cardiology</td><td>General Cardiology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">7</span></td><td class="ref-td-time">10:11 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">HAUGHTON, BEVERLY ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>—</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">6</span></td><td class="ref-td-time">10:07 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">BIONDI, ROCHELLE</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Macmelsie Marrero</td><td>Optometry</td><td>General Optometry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">5</span></td><td class="ref-td-time">10:05 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">FACEY, ICETA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Luis Arocha Yiong</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">4</span></td><td class="ref-td-time">10:02 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">CURRY, ELLA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Luis Arocha Yiong</td><td>Cardiology</td><td>General Cardiology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">3</span></td><td class="ref-td-time">9:35 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">RIVERA, DENNYS ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Macmelsie Marrero</td><td>Podiatry</td><td>General Podiatry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">2</span></td><td class="ref-td-time">9:21 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">ROPERO, LEO</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Juan Villarroel</td><td>Orthopedic</td><td>General Orthopedic</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr><tr class=""><td class="ref-td-num"><span class="ref-num-chip">1</span></td><td class="ref-td-time">9:21 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">DUCTAN, LORADIEU</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Americo Hajaz</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+      </section>
+
+      
+      <section class="ref-daily-page">
+        <section class="ref-section">
+          <div class="ref-section-head">
+            <h2 class="ref-section-title">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <path d="M5 4 H17 L19 6 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                <line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+              </svg>
+              <span>Daily Log</span>
+            </h2>
+            <div class="ref-section-controls">
+              <div class="ref-search">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                  <line x1="16" y1="16" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
+                </svg>
+                <input id="refSearch" type="search" placeholder="Search patient, doctor..." autocomplete="off">
+              </div>
+              <button class="ref-btn ref-btn-secondary" id="refRefreshBtn" type="button" title="Refresh data">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" class="ref-refresh-icon">
+                  <path d="M4 12 A8 8 0 0 1 18.5 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  <path d="M19 3 V8 H14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M20 12 A8 8 0 0 1 5.5 16.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  <path d="M5 21 V16 H10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+              <button class="ref-btn ref-btn-secondary" id="refPrintBtnDaily" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M7 9 V4 H17 V9 M7 19 H5 V12 H19 V19 H17 M7 14 H17 V21 H7 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+                </svg>
+                <span>Print</span>
+              </button>
+              <button class="ref-btn ref-btn-secondary" id="refFullscreenBtn" type="button" title="Toggle full screen">
+                <svg class="ref-icon-expand" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M4 9 V4 H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M20 9 V4 H15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M4 15 V20 H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M20 15 V20 H15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <svg class="ref-icon-collapse" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M9 4 V9 H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M15 4 V9 H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M9 20 V15 H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M15 20 V15 H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <span class="ref-fs-label">Full screen</span>
+              </button>
+              <button class="ref-btn ref-btn-primary" id="refAddBtn" type="button">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line>
+                  <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line>
+                </svg>
+                <span>New Referral</span>
+              </button>
+            </div>
+          </div>
+          <div class="ref-table-wrap">
+            <table class="ref-table">
+              <thead>
+                <tr>
+                  <th class="ref-th-num">#</th>
+                  <th>TIME</th>
+                  <th>WAIT</th>
+                  <th>BY</th>
+                  <th># REF</th>
+                  <th>PATIENT</th>
+                  <th>GH</th>
+                  <th>INSURANCE</th>
+                  <th>PROVIDER</th>
+                  <th>SPECIALTY</th>
+                  <th>SUBSPECIALTY</th>
+                  <th>STATUS</th>
+                  <th class="ref-th-action">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="refDailyBody"><tr class="" data-id="R2026072411200025686"><td class="ref-td-num"><span class="ref-num-chip">13</span></td><td class="ref-td-time">11:20 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">FORERO, ALLISON ,</td><td><span style="color:var(--text-muted)">—</span></td><td>PPO/Commercial · Blue Cross Blue Shield</td><td>Americo Hajaz</td><td>Optometry</td><td>General Optometry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072411145494047"><td class="ref-td-num"><span class="ref-num-chip">12</span></td><td class="ref-td-time">11:14 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">CARDONA, OFELIA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Luis Arocha Yiong</td><td>Neurology</td><td>General Neurology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072411043729637"><td class="ref-td-num"><span class="ref-num-chip">11</span></td><td class="ref-td-time">11:04 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">GALLEGO, CARMENZA</td><td><span style="color:var(--text-muted)">—</span></td><td>PPO/Commercial · Aetna</td><td>Macmelsie Marrero</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072411003665557"><td class="ref-td-num"><span class="ref-num-chip">10</span></td><td class="ref-td-time">11:00 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">VASQUEZ, MARIANELLY</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Preferred Care Partners</td><td>Americo Hajaz</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410570842380"><td class="ref-td-num"><span class="ref-num-chip">9</span></td><td class="ref-td-time">10:57 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">REID, MORRIE</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicaid · South Florida Community</td><td>Macmelsie Marrero</td><td>Ophthalmology</td><td>General Ophthalmology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410260895519"><td class="ref-td-num"><span class="ref-num-chip">8</span></td><td class="ref-td-time">10:26 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">DAVIS, JACQUELINE S</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Americo Hajaz</td><td>Cardiology</td><td>General Cardiology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410110436423"><td class="ref-td-num"><span class="ref-num-chip">7</span></td><td class="ref-td-time">10:11 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">HAUGHTON, BEVERLY ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>—</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410074479244"><td class="ref-td-num"><span class="ref-num-chip">6</span></td><td class="ref-td-time">10:07 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">BIONDI, ROCHELLE</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Macmelsie Marrero</td><td>Optometry</td><td>General Optometry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410051213722"><td class="ref-td-num"><span class="ref-num-chip">5</span></td><td class="ref-td-time">10:05 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">FACEY, ICETA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Luis Arocha Yiong</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072410023141541"><td class="ref-td-num"><span class="ref-num-chip">4</span></td><td class="ref-td-time">10:02 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">CURRY, ELLA ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Luis Arocha Yiong</td><td>Cardiology</td><td>General Cardiology</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072409351947057"><td class="ref-td-num"><span class="ref-num-chip">3</span></td><td class="ref-td-time">9:35 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">RIVERA, DENNYS ,</td><td><span style="color:var(--text-muted)">—</span></td><td>Marketplace · Oscar</td><td>Macmelsie Marrero</td><td>Podiatry</td><td>General Podiatry</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072409215931894"><td class="ref-td-num"><span class="ref-num-chip">2</span></td><td class="ref-td-time">9:21 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">ROPERO, LEO</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Juan Villarroel</td><td>Orthopedic</td><td>General Orthopedic</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr><tr class="" data-id="R2026072409212723364"><td class="ref-td-num"><span class="ref-num-chip">1</span></td><td class="ref-td-time">9:21 AM</td><td class="ref-td-wait"><span class="ref-wait-cell ref-wait-done">&lt;1 min</span></td><td>Eduardo Sandez</td><td><span class="ref-count-chip">1</span></td><td class="ref-td-name">DUCTAN, LORADIEU</td><td><span style="color:var(--text-muted)">—</span></td><td>Medicare · Aetna Medicare</td><td>Americo Hajaz</td><td>Radiology</td><td>X-Ray</td><td><span class="ref-status-pill ref-status-completed">Completed</span></td><td class="ref-td-action"><button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn ref-edit-btn" title="Edit" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg></button><button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button></td></tr></tbody>
+            </table>
+          </div>
+          <div class="ref-section-foot">
+            <span class="ref-foot-pill"><strong id="refDlSumTotal">13</strong> total referrals</span>
+            <span class="ref-foot-pill"><strong id="refDlSumPatients">13</strong> patients</span>
+            <span class="ref-foot-divider"></span>
+            <span class="ref-foot-pill ref-foot-pending"><strong id="refDlSumPending">0</strong> pending</span>
+            <span class="ref-foot-pill ref-foot-progress"><strong id="refDlSumProgress">0</strong> in progress</span>
+            <span class="ref-foot-pill ref-foot-completed"><strong id="refDlSumCompleted">13</strong> completed</span>
+            <span class="ref-foot-divider"></span>
+            <span class="ref-foot-text-light">Showing <span id="refDailyShown">13</span> of <span id="refDailyTotal">13</span></span>
+          </div>
+        </section>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  
+  <div class="ref-modal-overlay hidden" id="refModalOverlay">
+    <div class="ref-modal" role="dialog" aria-labelledby="refModalTitle">
+      <div class="ref-modal-head">
+        <h2 id="refModalTitle">New Referral</h2>
+        <button class="ref-modal-close" id="refModalClose" aria-label="Close">×</button>
+      </div>
+      <div class="ref-modal-body">
+        <div class="ref-patient-chip" id="refPatientChip"></div>
+        <div class="ref-form-grid">
+          <label class="ref-field ref-field-wide">
+            <span class="ref-field-label">Patient Name *</span>
+            <div class="ref-suggestions">
+              <input type="text" id="refFieldName" placeholder="LAST, FIRST" autocomplete="off">
+              <div class="ref-suggestions-list" id="refSuggestList"></div>
+            </div>
+          </label>
+          <label class="ref-field">
+            <span class="ref-field-label">Insurance Type</span>
+            <select id="refFieldInsType"></select>
+          </label>
+          <label class="ref-field">
+            <span class="ref-field-label">Insurance Plan</span>
+            <select id="refFieldInsPlan"></select>
+          </label>
+          <label class="ref-field">
+            <span class="ref-field-label">Provider</span>
+            <select id="refFieldProvider"></select>
+          </label>
+          <label class="ref-field">
+            <span class="ref-field-label"># of Referrals *</span>
+            <select id="refFieldRefCount"></select>
+          </label>
+          <div class="ref-field ref-field-wide">
+            <span class="ref-field-label">Group Home</span>
+            <label class="ref-checkbox-field" for="refFieldGroupHome">
+              <input type="checkbox" id="refFieldGroupHome">
+              <span class="ref-checkbox-field-text">This patient is from a Group Home</span>
+            </label>
+          </div>
+        </div>
+        <div class="ref-multi-block" id="refMultiBlock">
+          <div class="ref-multi-head" id="refMultiHead">Referral Details</div>
+          <div id="refMultiList"></div>
+        </div>
+      </div>
+      <div class="ref-modal-foot">
+        <button class="ref-btn ref-btn-secondary" id="refModalCancel" type="button">Cancel</button>
+        <button class="ref-btn ref-btn-primary" id="refModalSave" type="button">Save referral</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="ref-modal-overlay hidden" id="refDeleteOverlay">
+    <div class="ref-modal ref-modal-narrow" role="dialog">
+      <div class="ref-modal-head">
+        <h2>Delete referral?</h2>
+        <button class="ref-modal-close" id="refDeleteClose" aria-label="Close">×</button>
+      </div>
+      <div class="ref-modal-body">
+        <div class="ref-delete-summary" id="refDeleteSummary">—</div>
+        <p class="ref-delete-warning" id="refDeleteWarning"></p>
+      </div>
+      <div class="ref-modal-foot ref-modal-foot-stack" id="refDeleteFoot">
+        <button class="ref-btn ref-btn-secondary" id="refDeleteCancel" type="button">Cancel</button>
+        <button class="ref-btn ref-btn-danger ref-btn-outline" id="refDeleteOne" type="button">Delete this only</button>
+        <button class="ref-btn ref-btn-danger" id="refDeleteAll" type="button">Delete all</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="ref-modal-overlay hidden" id="refAlertOverlay">
+    <div class="ref-modal ref-modal-narrow ref-alert-modal" role="alertdialog">
+      <div class="ref-modal-head">
+        <h2 id="refAlertTitle">Notice</h2>
+        <button class="ref-modal-close" id="refAlertClose" aria-label="Close">×</button>
+      </div>
+      <div class="ref-modal-body">
+        <div class="ref-alert-icon" id="refAlertIcon">
+          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle>
+            <line x1="12" y1="8" x2="12" y2="13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></line>
+            <circle cx="12" cy="16.5" r="1.2" fill="currentColor"></circle>
+          </svg>
+        </div>
+        <p class="ref-alert-message" id="refAlertMessage">—</p>
+      </div>
+      <div class="ref-modal-foot">
+        <button class="ref-btn ref-btn-primary" id="refAlertOk" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let OPTIONS = null;
+  let dailyData = null;
+  let dashboardData = null;
+  let currentDateIso = '';
+  let currentEmployee = '';
+  let searchTerm = '';
+  let editingReferralId = null;
+  let pendingDelete = null;
+  let suggestionTimer = null;
+  let lastPickedPatient = null;
+  let isFirstLoad = true;
+  let clockTimer = null;
+  let refreshTimer = null;
+  let waitTicker = null;
+
+  try { currentEmployee = localStorage.getItem('ref_employee') || ''; } catch (e) {}
+
+  function $(id) { return document.getElementById(id); }
+
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+  function formatDateLong(iso) {
+    if (!iso) return '';
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return iso;
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    return months[parseInt(m[2]) - 1] + ' ' + parseInt(m[3]) + ', ' + m[1];
+  }
+  function fmtClock(d) {
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + m + ' ' + ampm;
+  }
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function formatNameDisplay(raw) {
+    if (!raw) return '';
+    const t = String(raw).trim();
+    if (t.indexOf(',') === -1) return titleCase(t);
+    const parts = t.split(',');
+    return titleCase(parts.slice(1).join(',').trim() + ' ' + parts[0].trim());
+  }
+  function titleCase(s) {
+    if (!s) return '';
+    return s.split(/\s+/).map(function (w) {
+      return w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : '';
+    }).join(' ');
+  }
+  function statusClass(status) {
+    if (status === 'Pending') return 'ref-status-pending';
+    if (status === 'In Progress') return 'ref-status-progress';
+    return 'ref-status-completed';
+  }
+  function formatWait(submittedMs, completedMs, status) {
+    if (!submittedMs) return '—';
+    const end = (status === 'Completed' && completedMs) ? completedMs : Date.now();
+    let secs = Math.max(0, Math.floor((end - submittedMs) / 1000));
+    const days = Math.floor(secs / 86400); secs -= days * 86400;
+    const hrs  = Math.floor(secs / 3600);  secs -= hrs * 3600;
+    const mins = Math.floor(secs / 60);
+    if (days > 0) return days + (days === 1 ? ' day ' : ' days ') + hrs + ' hr';
+    if (hrs > 0)  return hrs + ' hr ' + mins + ' min';
+    if (mins > 0) return mins + ' min';
+    return '<1 min';
+  }
+  function nextStatus(s) {
+    if (s === 'Pending') return 'In Progress';
+    if (s === 'In Progress') return 'Completed';
+    return 'Pending';
+  }
+
+  
+
+  function buildPharmacyOrder(list) {
+    const groups = [];
+    let current = null;
+    list.forEach(function (r) {
+      if (!r.parentId) {
+        current = { parent: r, clones: [] };
+        groups.push(current);
+      } else if (current && (current.parent.id === r.parentId)) {
+        current.clones.push(r);
+      } else {
+        
+        groups.push({ parent: r, clones: [], orphanClone: true });
+      }
+    });
+    groups.reverse();
+    const out = [];
+    let n = groups.length;
+    groups.forEach(function (g) {
+      out.push({ row: g.parent, num: g.orphanClone ? null : n });
+      g.clones.forEach(function (c) { out.push({ row: c, num: null }); });
+      if (!g.orphanClone) n--;
+    });
+    return out;
+  }
+
+  function showAlert(message, opts) {
+    opts = opts || {};
+    const overlay = $('refAlertOverlay');
+    const titleEl = $('refAlertTitle');
+    const msgEl   = $('refAlertMessage');
+    const iconEl  = $('refAlertIcon');
+    if (!overlay || !msgEl) return;
+
+    const tone = opts.tone || 'info';
+    titleEl.textContent = opts.title || (
+      tone === 'error'   ? 'Something went wrong' :
+      tone === 'warning' ? 'Heads up'              :
+      tone === 'success' ? 'Done'                  : 'Notice'
+    );
+    msgEl.textContent = String(message || '');
+    iconEl.className = 'ref-alert-icon is-' + tone;
+    overlay.classList.remove('hidden');
+    setTimeout(function () { $('refAlertOk').focus(); }, 50);
+  }
+  function closeAlert() { $('refAlertOverlay').classList.add('hidden'); }
+  function initAlertModal() {
+    $('refAlertOk').addEventListener('click', closeAlert);
+    $('refAlertClose').addEventListener('click', closeAlert);
+    $('refAlertOverlay').addEventListener('click', function (e) {
+      if (e.target.id === 'refAlertOverlay') closeAlert();
+    });
+    document.addEventListener('keydown', function (e) {
+      const open = !$('refAlertOverlay').classList.contains('hidden');
+      if (!open) return;
+      if (e.key === 'Escape' || e.key === 'Enter') closeAlert();
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    currentDateIso = todayIso();
+    $('refDateInput').value = currentDateIso;
+    $('refDateDisplay').textContent = formatDateLong(currentDateIso);
+
+    tickClock();
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = setInterval(tickClock, 1000);
+
+    $('refDateInput').addEventListener('change', function (e) {
+      currentDateIso = e.target.value || todayIso();
+      $('refDateDisplay').textContent = formatDateLong(currentDateIso);
+      isFirstLoad = true;
+      loadAll();
+    });
+    const dateLabel = document.querySelector('.ref-date-picker');
+    const dateInput = $('refDateInput');
+    if (dateLabel) {
+      dateLabel.addEventListener('click', function (e) {
+        if (e.target === dateInput) return;
+        try {
+          if (typeof dateInput.showPicker === 'function') dateInput.showPicker();
+          else { dateInput.focus(); dateInput.click(); }
+        } catch (err) { dateInput.focus(); dateInput.click(); }
+      });
+    }
+
+    document.querySelectorAll('.ref-nav-item').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        applyView(btn.getAttribute('data-section'));
+      });
+    });
+
+    $('refSearch').addEventListener('input', function (e) {
+      searchTerm = String(e.target.value || '').toLowerCase().trim();
+      renderDailyTable();
+    });
+
+    $('refAddBtn').addEventListener('click', function () {
+      openReferralModal(null);
+    });
+
+    $('refPrintBtnDashboard').addEventListener('click', printDailyLog);
+    $('refPrintBtnDaily').addEventListener('click', printDailyLog);
+
+    const refreshBtn = $('refRefreshBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function () {
+        const icon = refreshBtn.querySelector('.ref-refresh-icon');
+        if (icon) icon.classList.add('spinning');
+        setTimeout(function () {
+          if (icon) icon.classList.remove('spinning');
+        }, 1500);
+        loadAll();
+      });
+    }
+
+    const fsBtn = $('refFullscreenBtn');
+    if (fsBtn) {
+      fsBtn.addEventListener('click', function () {
+        document.body.classList.toggle('view-fullscreen');
+        const lbl = fsBtn.querySelector('.ref-fs-label');
+        if (lbl) {
+          lbl.textContent = document.body.classList.contains('view-fullscreen')
+            ? 'Exit full screen'
+            : 'Full screen';
+        }
+      });
+    }
+
+    initReferralModal();
+    initDeleteModal();
+    initAlertModal();
+
+    loadOptions(function () {
+      loadAll();
+      startAutoRefresh();
+    });
+  });
+
+  function tickClock() {
+    const el = $('refTimeNow');
+    if (el) el.textContent = fmtClock(new Date());
+  }
+
+  function applyView(target) {
+    document.querySelectorAll('.ref-nav-item').forEach(function (b) {
+      b.classList.remove('is-active');
+    });
+    const link = document.querySelector('.ref-nav-item[data-section="' + target + '"]');
+    if (link) link.classList.add('is-active');
+    document.body.classList.remove('view-dashboard', 'view-daily');
+    document.body.classList.add('view-' + target);
+    window.scrollTo({ top: 0 });
+  }
+
+  function startAutoRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadAll, 15000);
+    if (waitTicker) clearInterval(waitTicker);
+    waitTicker = setInterval(updateLiveWaits, 30000);
+  }
+
+  function updateLiveWaits() {
+    document.querySelectorAll('[data-wait-live="1"]').forEach(function (el) {
+      const sub = parseInt(el.getAttribute('data-submitted-ms'), 10);
+      if (!sub) return;
+      el.textContent = formatWait(sub, 0, 'In Progress');
+    });
+  }
+
+  function printDailyLog() {
+    const btns = [$('refPrintBtnDashboard'), $('refPrintBtnDaily')];
+    btns.forEach(function (b) { if (b) b.disabled = true; });
+    const restore = function () {
+      btns.forEach(function (b) { if (b) b.disabled = false; });
+    };
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      showAlert('Print is only available when the dashboard is running inside Google Apps Script.', { tone: 'warning' });
+      restore();
+      return;
+    }
+
+    const win = window.open('', '_blank', 'width=1100,height=800');
+    if (!win) {
+      showAlert('Pop-up blocked. Please allow pop-ups for this site to print.', { tone: 'warning' });
+      restore();
+      return;
+    }
+    win.document.write(
+      '<!DOCTYPE html><html><head><title>Preparing print…</title>' +
+      '<style>body{font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;' +
+      'color:#0f1d40;display:flex;align-items:center;justify-content:center;' +
+      'height:100vh;margin:0;background:#f4f6fb}' +
+      '.box{text-align:center}.spinner{width:36px;height:36px;border:4px solid #cdd5e8;' +
+      'border-top-color:#0a2a6e;border-radius:50%;animation:spin 0.8s linear infinite;' +
+      'margin:0 auto 14px}@keyframes spin{to{transform:rotate(360deg)}}</style></head>' +
+      '<body><div class="box"><div class="spinner"></div>' +
+      '<div>Preparing daily log…</div></div></body></html>'
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        restore();
+        if (!res || !res.success) {
+          win.document.body.innerHTML = '<div style="padding:30px;font-family:sans-serif;color:#c0392b">' +
+            'Could not generate print: ' + escapeHtml((res && res.error) || 'unknown error') + '</div>';
+          return;
+        }
+        win.document.open();
+        win.document.write(res.html);
+        win.document.close();
+      })
+      .withFailureHandler(function (err) {
+        restore();
+        win.document.body.innerHTML = '<div style="padding:30px;font-family:sans-serif;color:#c0392b">' +
+          'Could not generate print: ' + escapeHtml(String(err)) + '</div>';
+      })
+      .printDailyLogHtml(currentDateIso, currentEmployee);
+  }
+
+  function loadOptions(done) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      OPTIONS = stubOptions();
+      initEmployeeSelector();
+      done && done();
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        OPTIONS = (res && res.success) ? res : stubOptions();
+        initEmployeeSelector();
+        done && done();
+      })
+      .withFailureHandler(function (err) {
+        console.error('getReferralOptions failed', err);
+        OPTIONS = stubOptions();
+        initEmployeeSelector();
+        done && done();
+      })
+      .getReferralOptions();
+  }
+
+  function stubOptions() {
+    return {
+      success: true,
+      employees: ['Eduardo Sandez', 'Lilian Perdomo', 'Ercilia Mendoza'],
+      providers: [],
+      insuranceTypes: [],
+      plansMap: {},
+      specialties: [],
+      specialtyMap: {},
+      statusList: ['Pending', 'In Progress', 'Completed'],
+      agingThresholdDays: 7
+    };
+  }
+
+  function initEmployeeSelector() {
+    const wrap = $('refEmployeeWrap');
+    const btn = $('refEmployeeBtn');
+    const menu = $('refEmployeeMenu');
+    const valueEl = $('refEmployeeValue');
+
+    function renderEmployeeOptions() {
+      menu.innerHTML = (OPTIONS.employees || []).map(function (n) {
+        const isSelected = (n === currentEmployee);
+        return '<button type="button" class="ref-employee-option' +
+          (isSelected ? ' selected' : '') + '" data-employee="' + escapeHtml(n) + '">' +
+          escapeHtml(n) + '</button>';
+      }).join('');
+    }
+
+    function setEmployee(name) {
+      const changed = (name !== currentEmployee);
+      currentEmployee = name;
+      try { localStorage.setItem('ref_employee', currentEmployee); } catch (e) {}
+      valueEl.textContent = currentEmployee || 'Select your name…';
+      renderEmployeeOptions();
+      updateGreetSub();
+      if (changed) {
+        isFirstLoad = true;
+        loadAll();
+      }
+    }
+
+    function openMenu() {
+      renderEmployeeOptions();
+      menu.classList.remove('hidden');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function closeMenu() {
+      menu.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (currentEmployee && (OPTIONS.employees || []).indexOf(currentEmployee) === -1) {
+      currentEmployee = '';
+    }
+    if (!currentEmployee && OPTIONS.employees && OPTIONS.employees.length) {
+      currentEmployee = OPTIONS.employees[0];
+      try { localStorage.setItem('ref_employee', currentEmployee); } catch (e) {}
+    }
+    valueEl.textContent = currentEmployee || 'Select your name…';
+    renderEmployeeOptions();
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('hidden')) openMenu();
+      else closeMenu();
+    });
+    menu.addEventListener('click', function (e) {
+      const opt = e.target.closest('.ref-employee-option');
+      if (!opt) return;
+      e.stopPropagation();
+      setEmployee(opt.getAttribute('data-employee'));
+      closeMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) closeMenu();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !menu.classList.contains('hidden')) closeMenu();
+    });
+
+    updateGreetSub();
+  }
+
+  function updateGreetSub() {
+    const sub = $('refGreetSub');
+    if (!sub) return;
+    sub.textContent = currentEmployee
+      ? 'Showing referrals submitted by ' + currentEmployee + '.'
+      : 'Track and manage referrals for Mendez Medical Center.';
+  }
+
+  function loadAll() {
+    loadDashboard();
+    loadDaily();
+  }
+
+  function loadDashboard() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      dashboardData = stubDashboard();
+      renderDashboard();
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        dashboardData = (res && res.success) ? res : { success: false, error: (res && res.error) || 'Failed' };
+        renderDashboard();
+      })
+      .withFailureHandler(function (err) {
+        dashboardData = { success: false, error: String(err) };
+        renderDashboard();
+      })
+      .getReferralDashboard(currentDateIso, currentEmployee);
+  }
+
+  function loadDaily() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      dailyData = { success: true, referrals: [] };
+      renderDailyTable();
+      renderDashboardTable();
+      return;
+    }
+    if (isFirstLoad) {
+      $('refDailyBody').innerHTML = '<tr><td colspan="13" class="ref-empty">Loading…</td></tr>';
+    }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        dailyData = (res && res.success) ? res : { success: false, error: (res && res.error) || 'Failed' };
+        renderDailyTable();
+        renderDashboardTable();
+        const updEl = $('refTimeUpdated');
+        if (updEl) updEl.textContent = fmtClock(new Date());
+        isFirstLoad = false;
+      })
+      .withFailureHandler(function (err) {
+        dailyData = { success: false, error: String(err) };
+        renderDailyTable();
+        renderDashboardTable();
+      })
+      .getReferralsForDate(currentDateIso, currentEmployee);
+  }
+
+  function stubDashboard() {
+    return {
+      success: true,
+      date: currentDateIso,
+      isToday: true,
+      overall: { submitted: 0, inProgress: 0, completed: 0, pending: 0, totalReferrals: 0, totalPatients: 0 },
+      byEmployee: {},
+      aging: []
+    };
+  }
+
+  function renderDashboard() {
+    if (!dashboardData) return;
+    if (!dashboardData.success) {
+      $('refSumPending').textContent = '—';
+      $('refSumProgress').textContent = '—';
+      $('refSumCompleted').textContent = '—';
+      $('refSumPatients').textContent = '—';
+      $('refSumTotal').textContent = '—';
+      $('refDashTableBody').innerHTML = '<tr><td colspan="12" class="ref-empty ref-error">' +
+        escapeHtml(dashboardData.error || 'Failed to load') + '</td></tr>';
+      return;
+    }
+
+    const o = dashboardData.overall || {};
+    $('refSumPending').textContent   = o.pending || 0;
+    $('refSumProgress').textContent  = o.inProgress || 0;
+    $('refSumCompleted').textContent = o.completed || 0;
+    $('refSumPatients').textContent  = o.totalPatients || 0;
+    $('refSumTotal').textContent     = o.totalReferrals || 0;
+
+    $('refDlSumPending').textContent   = o.pending || 0;
+    $('refDlSumProgress').textContent  = o.inProgress || 0;
+    $('refDlSumCompleted').textContent = o.completed || 0;
+    $('refDlSumPatients').textContent  = o.totalPatients || 0;
+    $('refDlSumTotal').textContent     = o.totalReferrals || 0;
+  }
+
+  function renderDashboardTable() {
+    const body = $('refDashTableBody');
+    if (!body) return;
+    if (!dailyData || !dailyData.success) {
+      body.innerHTML = '<tr><td colspan="12" class="ref-empty ref-error">' +
+        escapeHtml((dailyData && dailyData.error) || 'Failed to load') + '</td></tr>';
+      return;
+    }
+    const all = dailyData.referrals || [];
+    if (!all.length) {
+      body.innerHTML = '<tr><td colspan="12" class="ref-empty">No referrals yet for this date.</td></tr>';
+      return;
+    }
+    
+    const ordered = buildPharmacyOrder(all);
+    body.innerHTML = ordered.map(function (item) {
+      const r = item.row;
+      const isClone = !!r.parentId;
+      const isPending = !!r._pending;
+      const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
+      const refChip = r.isParent
+        ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
+        : '<span style="color:var(--text-muted)">·</span>';
+      const ghCell = r.groupHome ? '<span class="ref-gh-pill">GH</span>' : '<span style="color:var(--text-muted)">—</span>';
+      const ins = r.insuranceType ? (r.insuranceType + (r.insurancePlan ? ' · ' + r.insurancePlan : '')) : '—';
+      const numCell = (item.num == null)
+        ? '<span style="color:var(--text-muted)">·</span>'
+        : '<span class="ref-num-chip">' + item.num + '</span>';
+      const isLive = (r.status !== 'Completed');
+      const waitText = formatWait(r.submittedAtMs, r.completedAtMs, r.status);
+      const waitCell = '<span class="ref-wait-cell ref-wait-' +
+        (r.status === 'Completed' ? 'done' : (r.status === 'In Progress' ? 'progress' : 'pending')) +
+        '"' + (isLive ? ' data-wait-live="1" data-submitted-ms="' + (r.submittedAtMs || 0) + '"' : '') + '>' +
+        escapeHtml(waitText) + '</span>';
+      return '<tr class="' + (isClone ? 'is-clone ' : '') + (isPending ? 'is-pending-save' : '') + '">' +
+        '<td class="ref-td-num">' + numCell + '</td>' +
+        '<td class="ref-td-time">' + escapeHtml(r.time || '') + '</td>' +
+        '<td class="ref-td-wait">' + waitCell + '</td>' +
+        '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
+        '<td>' + refChip + '</td>' +
+        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + '</td>' +
+        '<td>' + ghCell + '</td>' +
+        '<td>' + escapeHtml(ins) + '</td>' +
+        '<td>' + escapeHtml(r.provider || '—') + '</td>' +
+        '<td>' + escapeHtml(r.specialty || '—') + '</td>' +
+        '<td>' + escapeHtml(r.subspecialty || '—') + '</td>' +
+        '<td>' +
+          '<span class="ref-status-pill ' + statusClass(r.status) + '">' +
+            escapeHtml(r.status) +
+          '</span>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function renderDailyTable() {
+    const body = $('refDailyBody');
+    if (!dailyData) return;
+    if (!dailyData.success) {
+      body.innerHTML = '<tr><td colspan="13" class="ref-empty ref-error">' +
+        escapeHtml(dailyData.error || 'Failed to load') + '</td></tr>';
+      return;
+    }
+    const all = dailyData.referrals || [];
+    const term = (searchTerm || '').toLowerCase();
+    const filtered = term
+      ? all.filter(function (r) {
+          return (r.patientName || '').toLowerCase().indexOf(term) !== -1
+              || (r.provider || '').toLowerCase().indexOf(term) !== -1
+              || (r.specialty || '').toLowerCase().indexOf(term) !== -1
+              || (r.subspecialty || '').toLowerCase().indexOf(term) !== -1
+              || (r.submittedBy || '').toLowerCase().indexOf(term) !== -1
+              || (r.insuranceType || '').toLowerCase().indexOf(term) !== -1
+              || (r.insurancePlan || '').toLowerCase().indexOf(term) !== -1;
+        })
+      : all;
+
+    $('refDailyShown').textContent = filtered.length;
+    $('refDailyTotal').textContent = all.length;
+
+    if (!filtered.length) {
+      body.innerHTML = '<tr><td colspan="13" class="ref-empty">' +
+        (term ? 'No referrals match your search.' : 'No referrals yet for this date. Click "New Referral" to add one.') +
+        '</td></tr>';
+      return;
+    }
+
+    
+    const ordered = buildPharmacyOrder(filtered);
+    body.innerHTML = ordered.map(function (item) {
+      const r = item.row;
+      const isClone = !!r.parentId;
+      const isPending = !!r._pending;
+      const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
+      const refChip = r.isParent
+        ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
+        : '<span style="color:var(--text-muted)">·</span>';
+      const ghCell = r.groupHome ? '<span class="ref-gh-pill">GH</span>' : '<span style="color:var(--text-muted)">—</span>';
+      const ins = r.insuranceType ? (r.insuranceType + (r.insurancePlan ? ' · ' + r.insurancePlan : '')) : '—';
+      const numCell = (item.num == null)
+        ? '<span style="color:var(--text-muted)">·</span>'
+        : '<span class="ref-num-chip">' + item.num + '</span>';
+      const isLive = (r.status !== 'Completed');
+      const waitText = formatWait(r.submittedAtMs, r.completedAtMs, r.status);
+      const waitCell = '<span class="ref-wait-cell ref-wait-' +
+        (r.status === 'Completed' ? 'done' : (r.status === 'In Progress' ? 'progress' : 'pending')) +
+        '"' + (isLive ? ' data-wait-live="1" data-submitted-ms="' + (r.submittedAtMs || 0) + '"' : '') + '>' +
+        escapeHtml(waitText) + '</span>';
+
+      return '<tr class="' + (isClone ? 'is-clone ' : '') + (isPending ? 'is-pending-save' : '') + '" data-id="' + escapeHtml(r.id) + '">' +
+        '<td class="ref-td-num">' + numCell + '</td>' +
+        '<td class="ref-td-time">' + escapeHtml(r.time || '') + '</td>' +
+        '<td class="ref-td-wait">' + waitCell + '</td>' +
+        '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
+        '<td>' + refChip + '</td>' +
+        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + '</td>' +
+        '<td>' + ghCell + '</td>' +
+        '<td>' + escapeHtml(ins) + '</td>' +
+        '<td>' + escapeHtml(r.provider || '—') + '</td>' +
+        '<td>' + escapeHtml(r.specialty || '—') + '</td>' +
+        '<td>' + escapeHtml(r.subspecialty || '—') + '</td>' +
+        '<td>' +
+          '<span class="ref-status-pill ' + statusClass(r.status) + '">' +
+            escapeHtml(r.status) +
+          '</span>' +
+        '</td>' +
+        '<td class="ref-td-action">' +
+          (r.status !== 'Pending'
+            ? '<button class="ref-action-btn ref-back-btn" title="Move back" type="button">' +
+                '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
+                  '<path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+                  '<path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+                '</svg>' +
+              '</button>'
+            : '') +
+          (r.status === 'Pending'
+            ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
+            : '') +
+          (r.status === 'In Progress'
+            ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>'
+            : '') +
+          '<button class="ref-icon-btn ref-edit-btn" title="Edit" type="button">' +
+            '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
+              '<path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+            '</svg>' +
+          '</button>' +
+          '<button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button">' +
+            '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
+              '<path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>' +
+          '</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    body.querySelectorAll('.ref-start-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const id = btn.closest('tr').getAttribute('data-id');
+        setReferralStatus(id, 'In Progress');
+      });
+    });
+    body.querySelectorAll('.ref-complete-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const id = btn.closest('tr').getAttribute('data-id');
+        setReferralStatus(id, 'Completed');
+      });
+    });
+    body.querySelectorAll('.ref-back-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const tr = btn.closest('tr');
+        const id = tr.getAttribute('data-id');
+        const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+        if (!ref) return;
+        const prev = ref.status === 'Completed' ? 'In Progress' :
+                     ref.status === 'In Progress' ? 'Pending' : 'Pending';
+        setReferralStatus(id, prev);
+      });
+    });
+    body.querySelectorAll('.ref-edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const id = btn.closest('tr').getAttribute('data-id');
+        openReferralModalForId(id);
+      });
+    });
+    body.querySelectorAll('.ref-del-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const id = btn.closest('tr').getAttribute('data-id');
+        const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+        if (ref) openDeleteModal(ref);
+      });
+    });
+    body.querySelectorAll('tr[data-id]').forEach(function (tr) {
+      tr.addEventListener('click', function (e) {
+        if (e.target.closest('.ref-action-btn')) return;
+        if (e.target.closest('.ref-icon-btn')) return;
+        openReferralModalForId(tr.getAttribute('data-id'));
+      });
+    });
+  }
+
+  function setReferralStatus(id, target) {
+    const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+    if (!ref) return;
+    const prev = ref.status;
+    if (prev === target) return;
+
+    ref.status = target;
+    if (target === 'Completed') ref.completedAtMs = Date.now();
+    else ref.completedAtMs = 0;
+    renderDailyTable();
+    renderDashboardTable();
+
+    if (typeof google === 'undefined' || !google.script) return;
+    google.script.run
+      .withSuccessHandler(function () { loadDashboard(); })
+      .withFailureHandler(function (err) {
+        ref.status = prev;
+        renderDailyTable();
+        renderDashboardTable();
+        showAlert('Could not update: ' + err, { tone: 'error', title: 'Update failed' });
+      })
+      .updateReferral({
+        id: id,
+        fields: { status: target },
+        updatedBy: currentEmployee
+      });
+  }
+
+  function initReferralModal() {
+    const overlay = $('refModalOverlay');
+    $('refModalClose').addEventListener('click', closeReferralModal);
+    $('refModalCancel').addEventListener('click', closeReferralModal);
+    $('refModalSave').addEventListener('click', saveReferralModal);
+    overlay.addEventListener('click', function (e) {
+      if (e.target.id === 'refModalOverlay') closeReferralModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !overlay.classList.contains('hidden')) closeReferralModal();
+    });
+
+    $('refFieldInsType').addEventListener('change', function () {
+      populatePlans($('refFieldInsType').value, '');
+    });
+
+    $('refFieldRefCount').addEventListener('change', function () {
+      const n = parseInt($('refFieldRefCount').value, 10) || 1;
+      buildMultiRows(n, []);
+    });
+
+    $('refFieldName').addEventListener('input', function () {
+      const q = $('refFieldName').value;
+      if (suggestionTimer) clearTimeout(suggestionTimer);
+      if (!q || q.length < 2) {
+        $('refSuggestList').classList.remove('is-open');
+        return;
+      }
+      suggestionTimer = setTimeout(function () { fetchPatientSuggestions(q); }, 220);
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.ref-suggestions')) {
+        $('refSuggestList').classList.remove('is-open');
+      }
+    });
+  }
+
+  function openReferralModal(existingRef) {
+    editingReferralId = existingRef ? existingRef.id : null;
+    lastPickedPatient = null;
+    $('refModalTitle').textContent = existingRef ? 'Edit Referral' : 'New Referral';
+
+    fillSelect('refFieldInsType', OPTIONS.insuranceTypes || [], existingRef ? existingRef.insuranceType : '');
+    populatePlans(existingRef ? existingRef.insuranceType : '', existingRef ? existingRef.insurancePlan : '');
+    fillSelect('refFieldProvider', OPTIONS.providers || [], existingRef ? existingRef.provider : '');
+
+    const refCountEl = $('refFieldRefCount');
+    refCountEl.innerHTML = '';
+    for (let i = 1; i <= 15; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = String(i);
+      refCountEl.appendChild(opt);
+    }
+
+    if (existingRef) {
+      refCountEl.value = '1';
+      refCountEl.disabled = true;
+      $('refFieldName').value = existingRef.patientName || '';
+      $('refFieldGroupHome').checked = !!existingRef.groupHome;
+      buildMultiRows(1, [{
+        specialty: existingRef.specialty,
+        subspecialty: existingRef.subspecialty,
+        status: existingRef.status,
+        notes: existingRef.notes
+      }]);
+    } else {
+      refCountEl.value = '1';
+      refCountEl.disabled = false;
+      $('refFieldName').value = '';
+      $('refFieldGroupHome').checked = false;
+      buildMultiRows(1, []);
+    }
+
+    hidePatientChip();
+    $('refSuggestList').classList.remove('is-open');
+    $('refModalOverlay').classList.remove('hidden');
+    setTimeout(function () { $('refFieldName').focus(); }, 80);
+  }
+
+  function openReferralModalForId(id) {
+    const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+    if (ref) openReferralModal(ref);
+  }
+
+  function closeReferralModal() {
+    $('refModalOverlay').classList.add('hidden');
+    editingReferralId = null;
+  }
+
+  function fillSelect(id, options, currentValue) {
+    const sel = $(id);
+    if (!sel) return;
+    const list = options.slice();
+    if (currentValue && list.indexOf(currentValue) === -1) list.push(currentValue);
+    sel.innerHTML = '<option value=""></option>' + list.map(function (o) {
+      return '<option value="' + escapeHtml(o) + '"' +
+        (o === currentValue ? ' selected' : '') + '>' + escapeHtml(o) + '</option>';
+    }).join('');
+  }
+
+  function populatePlans(insType, currentPlan) {
+    const plans = (OPTIONS.plansMap && OPTIONS.plansMap[insType]) || [];
+    fillSelect('refFieldInsPlan', plans, currentPlan || '');
+  }
+
+  function buildMultiRows(n, prefill) {
+    const list = $('refMultiList');
+    const head = $('refMultiHead');
+    head.textContent = n > 1
+      ? 'Referral Details — ' + n + ' specialists'
+      : 'Referral Details';
+
+    list.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const data = prefill[i] || {};
+      const row = document.createElement('div');
+      row.className = 'ref-multi-row';
+      row.setAttribute('data-idx', String(i));
+
+      const headHtml = (n > 1)
+        ? '<div class="ref-multi-row-head">Referral ' + (i + 1) + ' of ' + n + '</div>'
+        : '';
+
+      row.innerHTML = headHtml +
+        '<div class="ref-multi-grid">' +
+          '<label class="ref-field">' +
+            '<span class="ref-field-label">Specialty *</span>' +
+            '<select class="ref-multi-spec"></select>' +
+          '</label>' +
+          '<label class="ref-field">' +
+            '<span class="ref-field-label">Subspecialty *</span>' +
+            '<select class="ref-multi-sub"></select>' +
+          '</label>' +
+          '<label class="ref-field">' +
+            '<span class="ref-field-label">Status</span>' +
+            '<select class="ref-multi-status"></select>' +
+          '</label>' +
+          '<label class="ref-field">' +
+            '<span class="ref-field-label">Notes</span>' +
+            '<input type="text" class="ref-multi-notes" placeholder="Optional...">' +
+          '</label>' +
+        '</div>';
+
+      list.appendChild(row);
+
+      const specSel = row.querySelector('.ref-multi-spec');
+      const subSel  = row.querySelector('.ref-multi-sub');
+      const statSel = row.querySelector('.ref-multi-status');
+      const notesEl = row.querySelector('.ref-multi-notes');
+
+      specSel.innerHTML = '<option value=""></option>' +
+        (OPTIONS.specialties || []).map(function (s) {
+          return '<option value="' + escapeHtml(s) + '"' +
+            (s === data.specialty ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+        }).join('');
+
+      const populateSubs = function (spec, currentSub) {
+        const subs = (OPTIONS.specialtyMap && OPTIONS.specialtyMap[spec]) || [];
+        subSel.innerHTML = '<option value=""></option>' + subs.map(function (s) {
+          return '<option value="' + escapeHtml(s) + '"' +
+            (s === currentSub ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+        }).join('');
+      };
+      populateSubs(data.specialty || '', data.subspecialty || '');
+      specSel.addEventListener('change', function () {
+        populateSubs(specSel.value, '');
+      });
+
+      statSel.innerHTML = (OPTIONS.statusList || []).map(function (s) {
+        return '<option value="' + escapeHtml(s) + '"' +
+          (s === (data.status || 'Pending') ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+      }).join('');
+
+      notesEl.value = data.notes || '';
+    }
+  }
+
+  function fetchPatientSuggestions(query) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success) return;
+        showPatientSuggestions(res.results || []);
+      })
+      .withFailureHandler(function () {})
+      .searchPatients(query);
+  }
+
+  function showPatientSuggestions(results) {
+    const list = $('refSuggestList');
+    if (!results.length) {
+      list.classList.remove('is-open');
+      return;
+    }
+    list.innerHTML = results.map(function (p, i) {
+      const lastSeen = p.lastVisitIso ? formatDateLong(p.lastVisitIso) : '';
+      return '<div class="ref-suggestion-item" data-idx="' + i + '">' +
+        '<div class="ref-suggestion-name">' + escapeHtml(formatNameDisplay(p.name)) + '</div>' +
+        '<div class="ref-suggestion-meta">' +
+          (p.insuranceType ? escapeHtml(p.insuranceType) + ' · ' : '') +
+          (lastSeen ? 'Last seen ' + escapeHtml(lastSeen) : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+    list.classList.add('is-open');
+    list.querySelectorAll('.ref-suggestion-item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        const p = results[parseInt(item.getAttribute('data-idx'), 10)];
+        applyPatientPick(p);
+        list.classList.remove('is-open');
+      });
+    });
+  }
+
+  function applyPatientPick(p) {
+    if (!p) return;
+    lastPickedPatient = p;
+    $('refFieldName').value = p.name || '';
+    $('refFieldGroupHome').checked = !!p.groupHome;
+    fillSelect('refFieldInsType', OPTIONS.insuranceTypes || [], p.insuranceType || '');
+    populatePlans(p.insuranceType || '', p.insurancePlan || '');
+    showPatientChip(p);
+  }
+
+  function showPatientChip(p) {
+    const chip = $('refPatientChip');
+    const lastSeen = p.lastVisitIso ? formatDateLong(p.lastVisitIso) : 'unknown';
+    const lastSpec = p.lastSpecialty || '—';
+    const lastDr   = p.lastProvider || '—';
+    chip.innerHTML = '<strong>Returning patient.</strong> Last referred ' +
+      escapeHtml(lastSeen) + ' to ' + escapeHtml(lastSpec) + ' with ' +
+      escapeHtml(lastDr) + '. Patient info auto-filled — please confirm before saving.';
+    chip.classList.add('is-visible');
+  }
+  function hidePatientChip() {
+    $('refPatientChip').classList.remove('is-visible');
+  }
+
+  function saveReferralModal() {
+    const name = ($('refFieldName').value || '').trim();
+    if (!name) { $('refFieldName').focus(); showAlert('Patient name is required.', { tone: 'warning' }); return; }
+    if (!currentEmployee) { showAlert('Please select an employee at the top of the page.', { tone: 'warning' }); return; }
+
+    const dob = '';
+    const groupHome = $('refFieldGroupHome').checked;
+    const insType = $('refFieldInsType').value || '';
+    const insPlan = $('refFieldInsPlan').value || '';
+    const provider = $('refFieldProvider').value || '';
+    const refCount = parseInt($('refFieldRefCount').value, 10) || 1;
+
+    const rows = [];
+    document.querySelectorAll('#refMultiList .ref-multi-row').forEach(function (row) {
+      rows.push({
+        specialty:    (row.querySelector('.ref-multi-spec').value || '').trim(),
+        subspecialty: (row.querySelector('.ref-multi-sub').value || '').trim(),
+        status:       (row.querySelector('.ref-multi-status').value || 'Pending').trim(),
+        notes:        (row.querySelector('.ref-multi-notes').value || '').trim()
+      });
+    });
+
+    for (let i = 0; i < rows.length; i++) {
+      if (!rows[i].specialty || !rows[i].subspecialty) {
+        showAlert('Please pick a Specialty and Subspecialty for referral ' + (i + 1) + '.', { tone: 'warning' });
+        return;
+      }
+    }
+
+    const saveBtn = $('refModalSave');
+    const orig = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    if (typeof google === 'undefined' || !google.script) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = orig;
+      closeReferralModal();
+      return;
+    }
+
+    if (editingReferralId) {
+      const r = rows[0];
+      const onDone = function () {
+        saveBtn.disabled = false;
+        saveBtn.textContent = orig;
+        closeReferralModal();
+        loadAll();
+      };
+      const onFail = function (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = orig;
+        showAlert('Could not save: ' + err, { tone: 'error', title: 'Save failed' });
+      };
+      google.script.run.withSuccessHandler(onDone).withFailureHandler(onFail)
+        .updateReferral({
+          id: editingReferralId,
+          updatedBy: currentEmployee,
+          fields: {
+            patientName: name,
+            dob: dob,
+            groupHome: groupHome,
+            insuranceType: insType,
+            insurancePlan: insPlan,
+            provider: provider,
+            specialty: r.specialty,
+            subspecialty: r.subspecialty,
+            status: r.status,
+            notes: r.notes
+          }
+        });
+      return;
+    }
+
+    const now = new Date();
+    const tempParentId = 'TMP_' + now.getTime() + '_' + Math.random().toString(36).slice(2, 7);
+    const tempRows = rows.map(function (r, i) {
+      const isParent = (i === 0);
+      return {
+        rowIndex: -1,
+        id: isParent ? tempParentId : (tempParentId + '_C' + i),
+        parentId: isParent ? '' : tempParentId,
+        isParent: isParent,
+        refCount: isParent ? rows.length : null,
+        dateIso: todayIso(),
+        date: '',
+        time: fmtClock(now).replace(/^0/, ''),
+        submittedBy: currentEmployee,
+        patientName: name,
+        dob: '',
+        dobIso: '',
+        groupHome: groupHome,
+        insuranceType: insType,
+        insurancePlan: insPlan,
+        provider: provider,
+        specialty: r.specialty,
+        subspecialty: r.subspecialty,
+        status: r.status || 'Pending',
+        notes: r.notes,
+        lastUpdated: '',
+        updatedBy: currentEmployee,
+        submittedAtMs: now.getTime(),
+        completedAtMs: (r.status === 'Completed') ? now.getTime() : 0,
+        _pending: true
+      };
+    });
+
+    if (!dailyData) dailyData = { success: true, referrals: [] };
+    if (!dailyData.referrals) dailyData.referrals = [];
+    dailyData.referrals = dailyData.referrals.concat(tempRows);
+    renderDailyTable();
+    renderDashboardTable();
+
+    if (dashboardData && dashboardData.success && dashboardData.overall) {
+      const o = dashboardData.overall;
+      o.totalReferrals = (o.totalReferrals || 0) + tempRows.length;
+      o.totalPatients  = (o.totalPatients  || 0) + 1;
+      tempRows.forEach(function (r) {
+        if (r.status === 'Pending')      o.pending     = (o.pending     || 0) + 1;
+        else if (r.status === 'In Progress') o.inProgress = (o.inProgress || 0) + 1;
+        else if (r.status === 'Completed')   o.completed  = (o.completed  || 0) + 1;
+      });
+      renderDashboard();
+    }
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = orig;
+    closeReferralModal();
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (dailyData && dailyData.referrals) {
+          dailyData.referrals = dailyData.referrals.filter(function (r) { return !r._pending; });
+        }
+        loadAll();
+      })
+      .withFailureHandler(function (err) {
+        if (dailyData && dailyData.referrals) {
+          dailyData.referrals = dailyData.referrals.filter(function (r) { return !r._pending; });
+        }
+        renderDailyTable();
+        renderDashboardTable();
+        loadAll();
+        showAlert('Could not save: ' + err, { tone: 'error', title: 'Save failed' });
+      })
+      .addReferral({
+        submittedBy: currentEmployee,
+        patientName: name,
+        dobIso: dob,
+        groupHome: groupHome,
+        insuranceType: insType,
+        insurancePlan: insPlan,
+        provider: provider,
+        refCount: refCount,
+        referrals: rows
+      });
+  }
+
+  function initDeleteModal() {
+    const overlay = $('refDeleteOverlay');
+    $('refDeleteClose').addEventListener('click', closeDeleteModal);
+    $('refDeleteCancel').addEventListener('click', closeDeleteModal);
+    $('refDeleteOne').addEventListener('click', function () { handleDeleteConfirm('single'); });
+    $('refDeleteAll').addEventListener('click', function () { handleDeleteConfirm('all'); });
+    overlay.addEventListener('click', function (e) {
+      if (e.target.id === 'refDeleteOverlay') closeDeleteModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !overlay.classList.contains('hidden')) closeDeleteModal();
+    });
+  }
+
+  function openDeleteModal(ref) {
+    pendingDelete = { id: ref.id, isParent: ref.isParent, ref: ref };
+    const summary = $('refDeleteSummary');
+    summary.innerHTML =
+      '<div class="ref-delete-name">' + escapeHtml(formatNameDisplay(ref.patientName)) + '</div>' +
+      '<div class="ref-delete-meta">' +
+        escapeHtml(ref.specialty || '—') + ' · ' +
+        escapeHtml(ref.subspecialty || '—') + ' · ' +
+        escapeHtml(ref.provider || '—') +
+      '</div>';
+
+    const groupId = ref.isParent ? ref.id : ref.parentId;
+    let groupSize = 1;
+    if (groupId && dailyData && dailyData.referrals) {
+      groupSize = dailyData.referrals.filter(function (r) {
+        return r.id === groupId || r.parentId === groupId;
+      }).length;
+    }
+    if (!groupSize) groupSize = ref.refCount || 1;
+
+    const warn = $('refDeleteWarning');
+    const oneBtn = $('refDeleteOne');
+    const allBtn = $('refDeleteAll');
+
+    if (groupSize > 1) {
+      warn.innerHTML =
+        '<strong>This patient has ' + groupSize + ' referrals.</strong> Choose how to delete:' +
+        '<br><br>' +
+        '• <strong>This one only</strong> — removes just this row, the other ' +
+        (groupSize - 1) + ' stay (count adjusts to ' + (groupSize - 1) + ').' +
+        '<br>' +
+        '• <strong>All for patient</strong> — removes all ' + groupSize + ' referrals.' +
+        '<br><br>' +
+        '<em>This action cannot be undone.</em>';
+      oneBtn.style.display = '';
+      allBtn.style.display = '';
+      oneBtn.textContent = 'Delete this only';
+      allBtn.textContent = 'Delete all ' + groupSize;
+    } else {
+      warn.innerHTML = 'This will permanently remove this referral. <em>This action cannot be undone.</em>';
+      oneBtn.style.display = 'none';
+      allBtn.style.display = '';
+      allBtn.textContent = 'Delete';
+    }
+
+    $('refDeleteOverlay').classList.remove('hidden');
+  }
+
+  function closeDeleteModal() {
+    $('refDeleteOverlay').classList.add('hidden');
+    pendingDelete = null;
+  }
+
+  function handleDeleteConfirm(scope) {
+    if (!pendingDelete) return;
+    const oneBtn = $('refDeleteOne');
+    const allBtn = $('refDeleteAll');
+    const cancelBtn = $('refDeleteCancel');
+    const origOne = oneBtn.textContent;
+    const origAll = allBtn.textContent;
+
+    oneBtn.disabled = true;
+    allBtn.disabled = true;
+    cancelBtn.disabled = true;
+    if (scope === 'single') oneBtn.textContent = 'Deleting…';
+    else allBtn.textContent = 'Deleting…';
+
+    const restore = function () {
+      oneBtn.disabled = false;
+      allBtn.disabled = false;
+      cancelBtn.disabled = false;
+      oneBtn.textContent = origOne;
+      allBtn.textContent = origAll;
+    };
+    const onDone = function () {
+      restore();
+      closeDeleteModal();
+      loadAll();
+    };
+    const onFail = function (err) {
+      restore();
+      showAlert('Could not delete: ' + err, { tone: 'error', title: 'Delete failed' });
+    };
+    if (typeof google === 'undefined' || !google.script) { onDone(); return; }
+    google.script.run.withSuccessHandler(onDone).withFailureHandler(onFail)
+      .deleteReferral(pendingDelete.id, currentEmployee, scope);
+  }
+</script>
+
+</body></html>
