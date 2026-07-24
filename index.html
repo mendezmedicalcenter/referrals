@@ -1241,6 +1241,10 @@
   body.view-fullscreen .ref-sidebar { display: none; }
   body.view-fullscreen .ref-app { grid-template-columns: 1fr; }
   body.view-fullscreen .ref-main { padding: 16px 24px; }
+  /* Embedded in the portal: hide our own sidebar (the portal already has one). */
+  body.embed .ref-sidebar { display: none; }
+  body.embed .ref-app { grid-template-columns: 1fr; }
+  body.embed .ref-main { padding: 14px 22px; }
 
    
   .ref-refresh-icon { transition: transform 0.3s; }
@@ -2342,6 +2346,17 @@
     currentDateIso = todayIso();
     $('refDateInput').value = currentDateIso;
     $('refDateDisplay').textContent = formatDateLong(currentDateIso);
+
+    // When embedded in the portal (?embed=1), hide our sidebar and let the parent
+    // pick the view (Dashboard / Daily Log) via the URL hash (#dashboard / #daily).
+    if (/[?&]embed=1/.test(location.search)) {
+      document.body.classList.add('embed');
+      var applyHashView = function () {
+        applyView(location.hash.replace(/^#/, '') === 'daily' ? 'daily' : 'dashboard');
+      };
+      applyHashView();
+      window.addEventListener('hashchange', applyHashView);
+    }
 
     tickClock();
     if (clockTimer) clearInterval(clockTimer);
