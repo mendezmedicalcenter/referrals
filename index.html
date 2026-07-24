@@ -1405,7 +1405,7 @@
   .ref-field select:focus,
   .ref-field textarea:focus {
     border-color: var(--m-blue-light);
-    background: #fff;
+    background-color: #fff; /* not the `background` shorthand — that would wipe the select's arrow image */
   }
 
   .ref-field select {
