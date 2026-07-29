@@ -1801,7 +1801,7 @@
   }
 
 </style></head>
-<body class="view-dashboard">
+<body class="view-daily">
 
   <div class="ref-app">
 
@@ -1812,23 +1812,14 @@
       </div>
 
       <nav class="ref-nav">
-        <button class="ref-nav-item is-active" data-section="dashboard">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
-            <rect x="13" y="3" width="8" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
-            <rect x="13" y="10" width="8" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
-            <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"></rect>
-          </svg>
-          <span>Dashboard</span>
-        </button>
-        <button class="ref-nav-item" data-section="daily">
+        <button class="ref-nav-item is-active" data-section="daily">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M5 4 H17 L19 6 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
             <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
             <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
             <line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line>
           </svg>
-          <span>Daily Log</span>
+          <span>Queue</span>
         </button>
       </nav>
 
@@ -1842,7 +1833,7 @@
 
       <header class="ref-header">
         <div class="ref-header-greeting">
-          <h1 class="ref-greet-title">Referrals Dashboard</h1>
+          <h1 class="ref-greet-title">Referrals Queue</h1>
           <p class="ref-greet-sub" id="refGreetSub">Showing referrals submitted by Eduardo Sandez.</p>
         </div>
         <div class="ref-header-controls">
@@ -2351,12 +2342,8 @@
     // pick the view (Dashboard / Daily Log) via the URL hash (#dashboard / #daily).
     if (/[?&]embed=1/.test(location.search)) {
       document.body.classList.add('embed');
-      var applyHashView = function () {
-        applyView(location.hash.replace(/^#/, '') === 'daily' ? 'daily' : 'dashboard');
-      };
-      applyHashView();
-      window.addEventListener('hashchange', applyHashView);
     }
+    applyView('daily'); // single Queue view (Dashboard removed)
 
     tickClock();
     if (clockTimer) clearInterval(clockTimer);
