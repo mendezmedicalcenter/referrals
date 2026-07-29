@@ -1800,11 +1800,8 @@
     vertical-align: middle !important;
   }
 
-  .ref-handoff{ margin:0 0 16px; border:1px solid #f0c56a; background:#fff8e8; border-radius:14px; padding:14px 18px; }
-  .ref-handoff-h{ font-weight:800; color:#9a6a12; font-size:14px; margin-bottom:6px; }
-  .ref-handoff-row{ display:flex; align-items:center; gap:14px; padding:7px 0; border-top:1px solid #f0e0b8; }
-  .ref-handoff-row b{ font-size:15px; color:#0a2a52; }
-  .ref-handoff-row span{ font-size:12.5px; color:#6b7a90; }
+  .ref-dob{ font-size:11px; color:#6b7a90; font-weight:600; margin-top:2px; }
+  .ref-fdtag{ display:inline-block; font-size:10px; font-weight:800; color:#9a6a12; background:#fff3d6; border:1px solid #f0c56a; border-radius:6px; padding:1px 5px; vertical-align:middle; }
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2063,7 +2060,6 @@
               </button>
             </div>
           </div>
-          <div id="ref-handoff"></div>
           <div class="ref-table-wrap">
             <table class="ref-table">
               <thead>
@@ -2247,12 +2243,28 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   var FD_SUPA_URL='https://ukvjrxvvaokklxrhrhss.supabase.co', FD_SUPA_KEY='sb_publishable_4zeQ0_L3_zOWRQQBeXlSDg_TIm-OCZw';
-  var fdsb=null, refHandoffs=[], fdWired=false;
+  var fdsb=null, fdWired=false, REF_LSK='ref_referrals_v1';
   function fdClient(){ if(!fdsb){ try{ if(window.supabase) fdsb=window.supabase.createClient(FD_SUPA_URL,FD_SUPA_KEY); }catch(e){} } return fdsb; }
   function fmtDobShort(d){ if(!d) return ''; var p=String(d).split('-'); return p.length===3?(p[1]+'/'+p[2]+'/'+p[0]):d; }
-  function refHandoffHTML(){ if(!refHandoffs.length) return '<div id="ref-handoff"></div>'; return '<div id="ref-handoff" class="ref-handoff"><div class="ref-handoff-h">↪ Sent from Front Desk — needs referral ('+refHandoffs.length+')</div>'+refHandoffs.map(function(h){ var nm=((h.last_name||'')+(h.first_name?(', '+h.first_name):'')); return '<div class="ref-handoff-row"><b>'+escapeHtml(nm)+'</b>'+(h.dob?'<span>DOB '+escapeHtml(fmtDobShort(h.dob))+'</span>':'')+(h.provider?'<span>'+escapeHtml(h.provider)+'</span>':'')+(h.insurance?'<span>'+escapeHtml(h.insurance)+'</span>':'')+'</div>'; }).join('')+'</div>'; }
-  function renderRefHandoff(){ var el=document.getElementById('ref-handoff'); if(el) el.outerHTML=refHandoffHTML(); }
-  function fetchRefHandoffs(){ var c=fdClient(); if(!c) return; c.from('visits').select('id,first_name,last_name,dob,provider,insurance').eq('day',currentDateIso).eq('needs_referral',true).then(function(r){ if(r&&!r.error){ refHandoffs=r.data||[]; renderRefHandoff(); } }); }
+  function refStoreLoad(){ try{ return JSON.parse(localStorage.getItem(REF_LSK)||'[]'); }catch(e){ return []; } }
+  function refStoreSave(rows){ try{ localStorage.setItem(REF_LSK, JSON.stringify(rows)); }catch(e){} }
+  function importRefHandoffs(list){
+    var rows=refStoreLoad(), existing={}; rows.forEach(function(r){ if(r.fdId) existing[r.fdId]=true; });
+    var added=false, now=Date.now(), t=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    var by=(typeof currentEmployee!=='undefined' && currentEmployee)?currentEmployee:'Front Desk';
+    list.forEach(function(h){
+      if(existing[h.id]) return;
+      var nm=((h.last_name||'')+(h.first_name?(', '+h.first_name):'')).trim(); if(!nm) return;
+      rows.push({ id:'RFD'+String(h.id).replace(/[^a-z0-9]/gi,'').slice(-14), parentId:'', isParent:true, refCount:1,
+        dateIso:currentDateIso, date:'', time:t, submittedBy:by, fdId:h.id,
+        patientName:nm.toUpperCase(), dob:'', dobIso:h.dob||'', groupHome:false,
+        insuranceType:'', insurancePlan:'', provider:h.provider||'', specialty:'', subspecialty:'',
+        status:'Pending', notes:'', lastUpdated:'', updatedBy:by, submittedAtMs:now, completedAtMs:0 });
+      added=true;
+    });
+    if(added){ refStoreSave(rows); if(typeof loadAll==='function') loadAll(); }
+  }
+  function fetchRefHandoffs(){ var c=fdClient(); if(!c) return; c.from('visits').select('id,first_name,last_name,dob,provider').eq('day',currentDateIso).eq('needs_referral',true).then(function(r){ if(r&&!r.error){ importRefHandoffs(r.data||[]); } }); }
   function initRefHandoffs(){ if(fdWired){ fetchRefHandoffs(); return; } var c=fdClient(); if(!c){ setTimeout(initRefHandoffs,400); return; } fdWired=true; fetchRefHandoffs(); try{ c.channel('fd-ref-handoff').on('postgres_changes',{event:'*',schema:'public',table:'visits'},function(){ fetchRefHandoffs(); }).subscribe(); }catch(e){} }
   function formatNameDisplay(raw) {
     if (!raw) return '';
@@ -2763,7 +2775,7 @@
         '<td class="ref-td-wait">' + waitCell + '</td>' +
         '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
         '<td>' + refChip + '</td>' +
-        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + '</td>' +
+        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
         '<td>' + ghCell + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
         '<td>' + escapeHtml(r.provider || '—') + '</td>' +
@@ -2838,7 +2850,7 @@
         '<td class="ref-td-wait">' + waitCell + '</td>' +
         '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
         '<td>' + refChip + '</td>' +
-        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + '</td>' +
+        '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
         '<td>' + ghCell + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
         '<td>' + escapeHtml(r.provider || '—') + '</td>' +
