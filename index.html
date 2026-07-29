@@ -2249,10 +2249,21 @@
   var fdsb=null, fdWired=false, REF_LSK='ref_referrals_v1';
   function fdClient(){ if(!fdsb){ try{ if(window.supabase) fdsb=window.supabase.createClient(FD_SUPA_URL,FD_SUPA_KEY); }catch(e){} } return fdsb; }
   function fmtDobShort(d){ if(!d) return ''; var p=String(d).split('-'); return p.length===3?(p[1]+'/'+p[2]+'/'+p[0]):d; }
+  // A Front Desk import still awaiting intake: has an fdId but no specialty picked yet.
+  function isFdIntake(r){ return !!(r && r.fdId && !r.specialty); }
   function refStoreLoad(){ try{ return JSON.parse(localStorage.getItem(REF_LSK)||'[]'); }catch(e){ return []; } }
   function refStoreSave(rows){ try{ localStorage.setItem(REF_LSK, JSON.stringify(rows)); }catch(e){} }
   function importRefHandoffs(list){
-    var rows=refStoreLoad(), existing={}; rows.forEach(function(r){ if(r.fdId) existing[r.fdId]=true; });
+    var rows=refStoreLoad(), changed=false;
+    // Migrate any Front Desk import still awaiting intake (no specialty picked yet) back to
+    // a proper placeholder. Fixes rows imported before the intake flow existed, which were
+    // stuck showing "# REF = 1" and could be Started like a normal referral.
+    rows.forEach(function(r){
+      if(r.fdId && !r.specialty && (r.fdPending!==true || r.refCount!==null || r.status!=='Pending')){
+        r.fdPending=true; r.refCount=null; r.status='Pending'; r.completedAtMs=0; changed=true;
+      }
+    });
+    var existing={}; rows.forEach(function(r){ if(r.fdId) existing[r.fdId]=true; });
     var added=false, now=Date.now(), t=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
     var by=(typeof currentEmployee!=='undefined' && currentEmployee)?currentEmployee:'Front Desk';
     list.forEach(function(h){
@@ -2265,7 +2276,7 @@
         status:'Pending', notes:'', lastUpdated:'', updatedBy:by, submittedAtMs:now, completedAtMs:0 });
       added=true;
     });
-    if(added){ refStoreSave(rows); if(typeof loadAll==='function') loadAll(); }
+    if(added||changed){ refStoreSave(rows); if(typeof loadAll==='function') loadAll(); }
   }
   function fetchRefHandoffs(){ var c=fdClient(); if(!c) return; c.from('visits').select('id,first_name,last_name,dob,provider').eq('day',currentDateIso).eq('needs_referral',true).then(function(r){ if(r&&!r.error){ importRefHandoffs(r.data||[]); } }); }
   function initRefHandoffs(){ if(fdWired){ fetchRefHandoffs(); return; } var c=fdClient(); if(!c){ setTimeout(initRefHandoffs,400); return; } fdWired=true; fetchRefHandoffs(); try{ c.channel('fd-ref-handoff').on('postgres_changes',{event:'*',schema:'public',table:'visits'},function(){ fetchRefHandoffs(); }).subscribe(); }catch(e){} }
@@ -2758,7 +2769,7 @@
       const isClone = !!r.parentId;
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
-      const refChip = r.fdPending
+      const refChip = isFdIntake(r)
         ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
         : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
@@ -2834,7 +2845,7 @@
       const isClone = !!r.parentId;
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
-      const refChip = r.fdPending
+      const refChip = isFdIntake(r)
         ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
         : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
@@ -2864,12 +2875,15 @@
         '<td>' + escapeHtml(r.specialty || '—') + '</td>' +
         '<td>' + escapeHtml(r.subspecialty || '—') + '</td>' +
         '<td>' +
-          '<span class="ref-status-pill ' + statusClass(r.status) + '">' +
-            escapeHtml(r.status) +
+          '<span class="ref-status-pill ' + statusClass(isFdIntake(r) ? 'Pending' : r.status) + '">' +
+            escapeHtml(isFdIntake(r) ? 'Pending' : r.status) +
           '</span>' +
         '</td>' +
         '<td class="ref-td-action">' +
-          (r.status !== 'Pending'
+          (isFdIntake(r)
+            ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
+            :
+          ((r.status !== 'Pending'
             ? '<button class="ref-action-btn ref-back-btn" title="Move back" type="button">' +
                 '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
                   '<path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
@@ -2878,13 +2892,11 @@
               '</button>'
             : '') +
           (r.status === 'Pending'
-            ? (r.fdPending
-                ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
-                : '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>')
+            ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
             : '') +
           (r.status === 'In Progress'
             ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>'
-            : '') +
+            : ''))) +
           '<button class="ref-icon-btn ref-edit-btn" title="Edit" type="button">' +
             '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
               '<path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
@@ -2936,7 +2948,7 @@
         e.stopPropagation();
         const id = btn.closest('tr').getAttribute('data-id');
         const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
-        if (ref && ref.fdPending) openFdIntake(id); else openReferralModalForId(id);
+        if (ref && isFdIntake(ref)) openFdIntake(id); else openReferralModalForId(id);
       });
     });
     body.querySelectorAll('.ref-del-btn').forEach(function (btn) {
@@ -2953,7 +2965,7 @@
         if (e.target.closest('.ref-icon-btn')) return;
         const id = tr.getAttribute('data-id');
         const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
-        if (ref && ref.fdPending) openFdIntake(id); else openReferralModalForId(id);
+        if (ref && isFdIntake(ref)) openFdIntake(id); else openReferralModalForId(id);
       });
     });
   }
