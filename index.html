@@ -1800,7 +1800,15 @@
     vertical-align: middle !important;
   }
 
-</style></head>
+  .ref-handoff{ margin:0 0 16px; border:1px solid #f0c56a; background:#fff8e8; border-radius:14px; padding:14px 18px; }
+  .ref-handoff-h{ font-weight:800; color:#9a6a12; font-size:14px; margin-bottom:6px; }
+  .ref-handoff-row{ display:flex; align-items:center; gap:14px; padding:7px 0; border-top:1px solid #f0e0b8; }
+  .ref-handoff-row b{ font-size:15px; color:#0a2a52; }
+  .ref-handoff-row span{ font-size:12.5px; color:#6b7a90; }
+
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 <body class="view-daily">
 
   <div class="ref-app">
@@ -2055,6 +2063,7 @@
               </button>
             </div>
           </div>
+          <div id="ref-handoff"></div>
           <div class="ref-table-wrap">
             <table class="ref-table">
               <thead>
@@ -2237,6 +2246,14 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  var FD_SUPA_URL='https://ukvjrxvvaokklxrhrhss.supabase.co', FD_SUPA_KEY='sb_publishable_4zeQ0_L3_zOWRQQBeXlSDg_TIm-OCZw';
+  var fdsb=null, refHandoffs=[], fdWired=false;
+  function fdClient(){ if(!fdsb){ try{ if(window.supabase) fdsb=window.supabase.createClient(FD_SUPA_URL,FD_SUPA_KEY); }catch(e){} } return fdsb; }
+  function fmtDobShort(d){ if(!d) return ''; var p=String(d).split('-'); return p.length===3?(p[1]+'/'+p[2]+'/'+p[0]):d; }
+  function refHandoffHTML(){ if(!refHandoffs.length) return '<div id="ref-handoff"></div>'; return '<div id="ref-handoff" class="ref-handoff"><div class="ref-handoff-h">↪ Sent from Front Desk — needs referral ('+refHandoffs.length+')</div>'+refHandoffs.map(function(h){ var nm=((h.last_name||'')+(h.first_name?(', '+h.first_name):'')); return '<div class="ref-handoff-row"><b>'+escapeHtml(nm)+'</b>'+(h.dob?'<span>DOB '+escapeHtml(fmtDobShort(h.dob))+'</span>':'')+(h.provider?'<span>'+escapeHtml(h.provider)+'</span>':'')+(h.insurance?'<span>'+escapeHtml(h.insurance)+'</span>':'')+'</div>'; }).join('')+'</div>'; }
+  function renderRefHandoff(){ var el=document.getElementById('ref-handoff'); if(el) el.outerHTML=refHandoffHTML(); }
+  function fetchRefHandoffs(){ var c=fdClient(); if(!c) return; c.from('visits').select('id,first_name,last_name,dob,provider,insurance').eq('day',currentDateIso).eq('needs_referral',true).then(function(r){ if(r&&!r.error){ refHandoffs=r.data||[]; renderRefHandoff(); } }); }
+  function initRefHandoffs(){ if(fdWired){ fetchRefHandoffs(); return; } var c=fdClient(); if(!c){ setTimeout(initRefHandoffs,400); return; } fdWired=true; fetchRefHandoffs(); try{ c.channel('fd-ref-handoff').on('postgres_changes',{event:'*',schema:'public',table:'visits'},function(){ fetchRefHandoffs(); }).subscribe(); }catch(e){} }
   function formatNameDisplay(raw) {
     if (!raw) return '';
     const t = String(raw).trim();
@@ -2344,6 +2361,7 @@
       document.body.classList.add('embed');
     }
     applyView('daily'); // single Queue view (Dashboard removed)
+    initRefHandoffs();
 
     tickClock();
     if (clockTimer) clearInterval(clockTimer);
@@ -2354,6 +2372,7 @@
       $('refDateDisplay').textContent = formatDateLong(currentDateIso);
       isFirstLoad = true;
       loadAll();
+      fetchRefHandoffs();
     });
     const dateLabel = document.querySelector('.ref-date-picker');
     const dateInput = $('refDateInput');
