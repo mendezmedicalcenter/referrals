@@ -2770,7 +2770,7 @@
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
       const refChip = isFdIntake(r)
-        ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
+        ? '<span style="color:var(--text-muted)">—</span>'
         : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
         : '<span style="color:var(--text-muted)">·</span>';
@@ -2846,7 +2846,7 @@
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
       const refChip = isFdIntake(r)
-        ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
+        ? '<span style="color:var(--text-muted)">—</span>'
         : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
         : '<span style="color:var(--text-muted)">·</span>';
