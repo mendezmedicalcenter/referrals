@@ -51,6 +51,7 @@
         rows.push({
           id: isParent ? pid : (pid + '_C' + i), parentId: isParent ? '' : pid, isParent: isParent,
           refCount: isParent ? refs.length : null, dateIso: di, date: '', time: t,
+          fdId: isParent ? (p.fdId || '') : '',
           submittedBy: p.submittedBy || '', patientName: p.patientName || '', dob: '', dobIso: p.dobIso || '',
           groupHome: !!p.groupHome, insuranceType: p.insuranceType || '', insurancePlan: p.insurancePlan || '',
           provider: p.provider || '', specialty: rr.specialty || '', subspecialty: rr.subspecialty || '',
@@ -1802,6 +1803,7 @@
 
   .ref-dob{ font-size:11px; color:#6b7a90; font-weight:600; margin-top:2px; }
   .ref-fdtag{ display:inline-block; font-size:10px; font-weight:800; color:#9a6a12; background:#fff3d6; border:1px solid #f0c56a; border-radius:6px; padding:1px 5px; vertical-align:middle; }
+  .ref-count-chip.ref-count-unknown{ background:#fff3d6; color:#9a6a12; border:1px solid #f0c56a; }
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2210,6 +2212,7 @@
   let clockTimer = null;
   let refreshTimer = null;
   let waitTicker = null;
+  let fdIntake = null; // when set, the New Referral modal is completing a Front Desk handoff
 
   try { currentEmployee = localStorage.getItem('ref_employee') || ''; } catch (e) {}
 
@@ -2255,8 +2258,8 @@
     list.forEach(function(h){
       if(existing[h.id]) return;
       var nm=((h.last_name||'')+(h.first_name?(', '+h.first_name):'')).trim(); if(!nm) return;
-      rows.push({ id:'RFD'+String(h.id).replace(/[^a-z0-9]/gi,'').slice(-14), parentId:'', isParent:true, refCount:1,
-        dateIso:currentDateIso, date:'', time:t, submittedBy:by, fdId:h.id,
+      rows.push({ id:'RFD'+String(h.id).replace(/[^a-z0-9]/gi,'').slice(-14), parentId:'', isParent:true, refCount:null,
+        dateIso:currentDateIso, date:'', time:t, submittedBy:by, fdId:h.id, fdPending:true,
         patientName:nm.toUpperCase(), dob:'', dobIso:h.dob||'', groupHome:false,
         insuranceType:'', insurancePlan:'', provider:h.provider||'', specialty:'', subspecialty:'',
         status:'Pending', notes:'', lastUpdated:'', updatedBy:by, submittedAtMs:now, completedAtMs:0 });
@@ -2755,7 +2758,9 @@
       const isClone = !!r.parentId;
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
-      const refChip = r.isParent
+      const refChip = r.fdPending
+        ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
+        : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
         : '<span style="color:var(--text-muted)">·</span>';
       const ghCell = r.groupHome ? '<span class="ref-gh-pill">GH</span>' : '<span style="color:var(--text-muted)">—</span>';
@@ -2829,7 +2834,9 @@
       const isClone = !!r.parentId;
       const isPending = !!r._pending;
       const indent = isClone ? '<span class="ref-clone-indent">↳</span>' : '';
-      const refChip = r.isParent
+      const refChip = r.fdPending
+        ? '<span class="ref-count-chip ref-count-unknown" title="Number set when you press Start">?</span>'
+        : r.isParent
         ? '<span class="ref-count-chip">' + (r.refCount || 1) + '</span>'
         : '<span style="color:var(--text-muted)">·</span>';
       const ghCell = r.groupHome ? '<span class="ref-gh-pill">GH</span>' : '<span style="color:var(--text-muted)">—</span>';
@@ -2871,7 +2878,9 @@
               '</button>'
             : '') +
           (r.status === 'Pending'
-            ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
+            ? (r.fdPending
+                ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
+                : '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>')
             : '') +
           (r.status === 'In Progress'
             ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>'
@@ -2897,6 +2906,12 @@
         setReferralStatus(id, 'In Progress');
       });
     });
+    body.querySelectorAll('.ref-fdstart-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openFdIntake(btn.closest('tr').getAttribute('data-id'));
+      });
+    });
     body.querySelectorAll('.ref-complete-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -2920,7 +2935,8 @@
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         const id = btn.closest('tr').getAttribute('data-id');
-        openReferralModalForId(id);
+        const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+        if (ref && ref.fdPending) openFdIntake(id); else openReferralModalForId(id);
       });
     });
     body.querySelectorAll('.ref-del-btn').forEach(function (btn) {
@@ -2935,7 +2951,9 @@
       tr.addEventListener('click', function (e) {
         if (e.target.closest('.ref-action-btn')) return;
         if (e.target.closest('.ref-icon-btn')) return;
-        openReferralModalForId(tr.getAttribute('data-id'));
+        const id = tr.getAttribute('data-id');
+        const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+        if (ref && ref.fdPending) openFdIntake(id); else openReferralModalForId(id);
       });
     });
   }
@@ -3006,6 +3024,7 @@
   }
 
   function openReferralModal(existingRef) {
+    fdIntake = null;
     editingReferralId = existingRef ? existingRef.id : null;
     lastPickedPatient = null;
     $('refModalTitle').textContent = existingRef ? 'Edit Referral' : 'New Referral';
@@ -3053,9 +3072,22 @@
     if (ref) openReferralModal(ref);
   }
 
+  // Front Desk handoff: open the New Referral form (count selectable) prefilled with
+  // the imported name + DOB, so staff choose how many referrals and fill the rest.
+  function openFdIntake(id) {
+    const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
+    if (!ref) return;
+    openReferralModal(null); // fresh New-Referral form (refCount enabled)
+    fdIntake = { id: ref.id, fdId: ref.fdId || '', dobIso: ref.dobIso || '' };
+    $('refFieldName').value = ref.patientName || '';
+    if (ref.provider) { const pv = $('refFieldProvider'); if (pv) pv.value = ref.provider; }
+    $('refModalTitle').textContent = 'Referral Intake — ' + formatNameDisplay(ref.patientName);
+  }
+
   function closeReferralModal() {
     $('refModalOverlay').classList.add('hidden');
     editingReferralId = null;
+    fdIntake = null;
   }
 
   function fillSelect(id, options, currentValue) {
@@ -3208,11 +3240,12 @@
   }
 
   function saveReferralModal() {
+    const intake = fdIntake; // Front Desk placeholder being completed (null for normal New Referral)
     const name = ($('refFieldName').value || '').trim();
     if (!name) { $('refFieldName').focus(); showAlert('Patient name is required.', { tone: 'warning' }); return; }
     if (!currentEmployee) { showAlert('Please select an employee at the top of the page.', { tone: 'warning' }); return; }
 
-    const dob = '';
+    const dob = intake ? (intake.dobIso || '') : '';
     const groupHome = $('refFieldGroupHome').checked;
     const insType = $('refFieldInsType').value || '';
     const insPlan = $('refFieldInsPlan').value || '';
@@ -3297,7 +3330,8 @@
         submittedBy: currentEmployee,
         patientName: name,
         dob: '',
-        dobIso: '',
+        dobIso: (isParent && intake) ? (intake.dobIso || '') : '',
+        fdId: (isParent && intake) ? (intake.fdId || '') : '',
         groupHome: groupHome,
         insuranceType: insType,
         insurancePlan: insPlan,
@@ -3316,6 +3350,7 @@
 
     if (!dailyData) dailyData = { success: true, referrals: [] };
     if (!dailyData.referrals) dailyData.referrals = [];
+    if (intake) dailyData.referrals = dailyData.referrals.filter(function (r) { return r.id !== intake.id; });
     dailyData.referrals = dailyData.referrals.concat(tempRows);
     renderDailyTable();
     renderDashboardTable();
@@ -3341,7 +3376,14 @@
         if (dailyData && dailyData.referrals) {
           dailyData.referrals = dailyData.referrals.filter(function (r) { return !r._pending; });
         }
-        loadAll();
+        if (intake && intake.id) {
+          google.script.run
+            .withSuccessHandler(function () { loadAll(); })
+            .withFailureHandler(function () { loadAll(); })
+            .deleteReferral(intake.id, currentEmployee, 'single');
+        } else {
+          loadAll();
+        }
       })
       .withFailureHandler(function (err) {
         if (dailyData && dailyData.referrals) {
@@ -3356,6 +3398,7 @@
         submittedBy: currentEmployee,
         patientName: name,
         dobIso: dob,
+        fdId: intake ? (intake.fdId || '') : '',
         groupHome: groupHome,
         insuranceType: insType,
         insurancePlan: insPlan,
