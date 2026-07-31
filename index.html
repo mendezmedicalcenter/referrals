@@ -893,12 +893,23 @@
     font-weight: 400;
   }
 
-  .ref-th-action { text-align: right !important; }
+  .ref-th-action { text-align: center !important; }
 
   .ref-td-action {
-    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     white-space: nowrap;
   }
+  .ref-td-action.ref-has-primary {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 6px;
+  }
+  .ref-act-left { justify-self: start; display: inline-flex; align-items: center; gap: 4px; }
+  .ref-act-mid { justify-self: center; display: inline-flex; align-items: center; }
+  .ref-act-right { justify-self: end; display: inline-flex; align-items: center; }
 
    
   .ref-th-num,
@@ -2865,6 +2876,13 @@
         '"' + (isLive ? ' data-wait-live="1" data-submitted-ms="' + (r.submittedAtMs || 0) + '"' : '') + '>' +
         escapeHtml(waitText) + '</span>';
 
+      const REF_BACK = '<button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      const REF_TRASH = '<button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      const refPrimary = isFdIntake(r) ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
+        : (r.status === 'Pending' ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
+        : (r.status === 'In Progress' ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>' : ''));
+      const refBack = (!isFdIntake(r) && r.status !== 'Pending') ? REF_BACK : '';
+
       return '<tr class="' + (isClone ? 'is-clone ' : '') + (isPending ? 'is-pending-save' : '') + '" data-id="' + escapeHtml(r.id) + '">' +
         '<td class="ref-td-num">' + numCell + '</td>' +
         '<td class="ref-td-time">' + escapeHtml(r.time || '') + '</td>' +
@@ -2882,34 +2900,12 @@
             escapeHtml(isFdIntake(r) ? 'Pending' : r.status) +
           '</span>' +
         '</td>' +
-        '<td class="ref-td-action">' +
-          (isFdIntake(r)
-            ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
-            :
-          ((r.status !== 'Pending'
-            ? '<button class="ref-action-btn ref-back-btn" title="Move back" type="button">' +
-                '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
-                  '<path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-                  '<path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-                '</svg>' +
-              '</button>'
-            : '') +
-          (r.status === 'Pending'
-            ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
-            : '') +
-          (r.status === 'In Progress'
-            ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>'
-            : ''))) +
-          '<button class="ref-icon-btn ref-edit-btn" title="Edit" type="button">' +
-            '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
-              '<path d="M4 20 H8 L18 10 L14 6 L4 16 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
-            '</svg>' +
-          '</button>' +
-          '<button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button">' +
-            '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
-              '<path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-            '</svg>' +
-          '</button>' +
+        '<td class="ref-td-action' + (refPrimary ? ' ref-has-primary' : '') + '">' +
+          (refPrimary
+            ? ('<span class="ref-act-left">' + refBack + '</span>' +
+               '<span class="ref-act-mid">' + refPrimary + '</span>' +
+               '<span class="ref-act-right">' + REF_TRASH + '</span>')
+            : (refBack + REF_TRASH)) +
         '</td>' +
       '</tr>';
     }).join('');
