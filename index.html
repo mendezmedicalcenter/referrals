@@ -868,8 +868,8 @@
   .ref-table tbody tr {
     transition: background 0.1s;
   }
-  .ref-table tbody td.ref-refcell { cursor: pointer; white-space: nowrap; }
-  .ref-refedit { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; color: #1d5bbf; opacity: 0; transition: opacity .12s; }
+  .ref-table tbody td.ref-refcell { cursor: pointer; white-space: nowrap; position: relative; }
+  .ref-refedit { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: inline-flex; align-items: center; color: #1d5bbf; opacity: 0; transition: opacity .12s; }
   .ref-table tbody td.ref-refcell:hover .ref-refedit { opacity: 1; }
 
   /* Custom Provider dropdown — same component as Front Desk / Pharmacy */
