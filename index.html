@@ -2252,6 +2252,7 @@
   let currentEmployee = '';
   let searchTerm = '';
   let editingReferralId = null;
+  let editModalGroupIds = null;
   let pendingDelete = null;
   let suggestionTimer = null;
   let lastPickedPatient = null;
@@ -3190,17 +3191,22 @@
     }
 
     if (existingRef) {
-      refCountEl.value = '1';
+      // Load ALL referrals for this patient's group so each one can be edited.
+      var groupId = existingRef.isParent ? existingRef.id : (existingRef.parentId || existingRef.id);
+      var group = (dailyData.referrals || []).filter(function (x) { return x.id === groupId || x.parentId === groupId; });
+      group.sort(function (a, b) { return (a.isParent ? 0 : 1) - (b.isParent ? 0 : 1); });
+      if (!group.length) group = [existingRef];
+      editModalGroupIds = group.map(function (x) { return x.id; });
+      editingReferralId = group[0].id;
+      refCountEl.value = String(group.length);
       refCountEl.disabled = true;
       $('refFieldName').value = existingRef.patientName || '';
       $('refFieldGroupHome').checked = !!existingRef.groupHome;
-      buildMultiRows(1, [{
-        specialty: existingRef.specialty,
-        subspecialty: existingRef.subspecialty,
-        status: existingRef.status,
-        notes: existingRef.notes
-      }]);
+      buildMultiRows(group.length, group.map(function (x) {
+        return { specialty: x.specialty, subspecialty: x.subspecialty, status: x.status, notes: x.notes };
+      }));
     } else {
+      editModalGroupIds = null;
       refCountEl.value = '1';
       refCountEl.disabled = false;
       $('refFieldName').value = '';
@@ -3235,6 +3241,7 @@
   function closeReferralModal() {
     $('refModalOverlay').classList.add('hidden');
     editingReferralId = null;
+    editModalGroupIds = null;
     fdIntake = null;
   }
 
@@ -3430,7 +3437,6 @@
     }
 
     if (editingReferralId) {
-      const r = rows[0];
       const onDone = function () {
         saveBtn.disabled = false;
         saveBtn.textContent = orig;
@@ -3442,23 +3448,26 @@
         saveBtn.textContent = orig;
         showAlert('Could not save: ' + err, { tone: 'error', title: 'Save failed' });
       };
-      google.script.run.withSuccessHandler(onDone).withFailureHandler(onFail)
-        .updateReferral({
-          id: editingReferralId,
-          updatedBy: currentEmployee,
-          fields: {
-            patientName: name,
-            dob: dob,
-            groupHome: groupHome,
-            insuranceType: insType,
-            insurancePlan: insPlan,
-            provider: provider,
-            specialty: r.specialty,
-            subspecialty: r.subspecialty,
-            status: r.status,
-            notes: r.notes
-          }
-        });
+      var ids = (editModalGroupIds && editModalGroupIds.length) ? editModalGroupIds : [editingReferralId];
+      var pending = 0, failed = false;
+      var finishOne = function () { pending--; if (pending <= 0 && !failed) onDone(); };
+      ids.forEach(function (rid, i) {
+        if (i >= rows.length) return;
+        var r = rows[i];
+        pending++;
+        google.script.run.withSuccessHandler(finishOne).withFailureHandler(function (err) { if (!failed) { failed = true; onFail(err); } })
+          .updateReferral({
+            id: rid,
+            updatedBy: currentEmployee,
+            fields: {
+              patientName: name, dob: dob, groupHome: groupHome,
+              insuranceType: insType, insurancePlan: insPlan, insurance: insPlan,
+              provider: provider,
+              specialty: r.specialty, subspecialty: r.subspecialty, status: r.status, notes: r.notes
+            }
+          });
+      });
+      if (pending === 0) onDone();
       return;
     }
 
