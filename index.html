@@ -872,6 +872,19 @@
   .ref-refedit { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; color: #1d5bbf; opacity: 0; transition: opacity .12s; }
   .ref-table tbody td.ref-refcell:hover .ref-refedit { opacity: 1; }
 
+  /* Custom Provider dropdown — same component as Front Desk / Pharmacy */
+  .xsel{ position:relative; display:inline-flex; align-items:center; gap:7px; min-width:150px; max-width:100%; box-sizing:border-box; border:1px solid #e2e9f3; border-radius:9px; padding:6px 12px; font-size:12.5px; font-weight:600; color:#123a70; cursor:pointer; background:#f5f8fd; white-space:nowrap; user-select:none; transition:border-color .15s, background .15s, box-shadow .15s; }
+  .xsel:hover{ background:#eef3fb; border-color:#cdd9ec; }
+  .xsel.open{ border-color:#2563b0; background:#fff; box-shadow:0 0 0 3px rgba(37,99,176,.13); }
+  .xsel-val{ flex:1 1 auto; text-align:center; overflow:hidden; text-overflow:ellipsis; }
+  .xsel-cv{ width:10px; height:6px; flex:0 0 auto; }
+  .xsel-menu{ position:fixed; z-index:1000; background:#fff; border:1px solid #dbe6f5; border-radius:11px; box-shadow:0 14px 34px rgba(16,40,80,.18); padding:5px; max-height:300px; overflow-y:auto; }
+  .xsel-menu[hidden]{ display:none; }
+  .xsel-opt{ padding:8px 16px; border-radius:7px; font-size:12.5px; font-weight:600; color:#123a70; text-align:center; white-space:nowrap; cursor:pointer; }
+  .xsel-opt:hover{ background:#eef3fb; }
+  .xsel-opt.sel{ background:#2563b0; color:#fff; }
+  .xsel-opt.ph{ color:#8aa0bd; }
+
   .ref-table tbody tr:hover { background: var(--panel-2); }
 
   .ref-table tbody tr.is-clone { background: rgba(31,76,199,0.03); }
@@ -2491,6 +2504,18 @@
       if (e.key === 'Escape' && document.body.classList.contains('view-fullscreen')) { refSetFull(false); }
     });
 
+    // Custom Provider dropdown (xsel) — open / select / close, same behavior as Front Desk / Pharmacy
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      var xopt = t.closest && t.closest('.xsel-opt');
+      if (xopt) { var xbox = xopt.closest('.xsel'); if (xbox && xbox.getAttribute('data-field') === 'provider') { setReferralProvider(xbox.getAttribute('data-id'), xopt.getAttribute('data-v')); closeAllXsel(); if (typeof renderDailyTable === 'function') renderDailyTable(); } e.stopPropagation(); return; }
+      var xb = t.closest && t.closest('.xsel');
+      if (xb) { if (xb.querySelector('.xsel-menu').hidden) openXsel(xb); else closeAllXsel(); e.stopPropagation(); return; }
+      closeAllXsel();
+    });
+    window.addEventListener('scroll', function (e) { if (e.target && e.target.closest && e.target.closest('.xsel-menu')) return; closeAllXsel(); }, true);
+    window.addEventListener('resize', closeAllXsel);
+
     initReferralModal();
     initDeleteModal();
     initAlertModal();
@@ -2847,12 +2872,18 @@
       ? OPTIONS.providers
       : ['Aidee Fabre','Americo Hajaz','Juan Villarroel','Lecia Villames','Leopold Chery','Luis Arocha Yiong','Macmelsie Marrero','Marie Vales-Preval','Oscar Mendez','Victor Francisco'];
   }
+  function xOptFlat(list,val){ return list.map(function(n){ return '<div class="xsel-opt'+(val===n?' sel':'')+'" data-v="'+escapeHtml(n)+'">'+escapeHtml(n)+'</div>'; }).join(''); }
+  function xselHTML(id,field,val,ph,optsInner){
+    var label=val||ph;
+    var phOpt='<div class="xsel-opt ph'+(val?'':' sel')+'" data-v="">'+escapeHtml(ph)+'</div>';
+    return '<div class="xsel'+(val?'':' isph')+'" data-id="'+escapeHtml(id)+'" data-field="'+field+'" tabindex="0"><span class="xsel-val">'+escapeHtml(label)+'</span>'+
+      '<svg class="xsel-cv" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="#516b90" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+      '<div class="xsel-menu" hidden>'+phOpt+optsInner+'</div></div>';
+  }
+  function closeAllXsel(){ var m=document.querySelectorAll('.xsel-menu'); for(var i=0;i<m.length;i++) m[i].hidden=true; var b=document.querySelectorAll('.xsel.open'); for(var j=0;j<b.length;j++) b[j].classList.remove('open'); }
+  function openXsel(box){ closeAllXsel(); var menu=box.querySelector('.xsel-menu'); if(!menu) return; var r=box.getBoundingClientRect(); menu.style.minWidth=r.width+'px'; menu.style.maxHeight='none'; menu.hidden=false; box.classList.add('open'); var mw=menu.offsetWidth, natural=menu.scrollHeight; var below=window.innerHeight-r.bottom-12, above=r.top-12; var up=(below<120)&&(above>below+40); var avail=up?above:below; var h=Math.min(natural,Math.max(120,avail)); menu.style.maxHeight=h+'px'; menu.style.top=(up?(r.top-4-h):(r.bottom+4))+'px'; var left=r.left+r.width/2-mw/2; if(left<6) left=6; if(left+mw>window.innerWidth-6) left=window.innerWidth-6-mw; menu.style.left=left+'px'; var s=menu.querySelector('.xsel-opt.sel'); if(s) s.scrollIntoView({block:'nearest'}); }
   function providerSelectHTML(r) {
-    var cur = r.provider || '';
-    var opts = '<option value="">— Select —</option>' + refProviderList().map(function (nm) {
-      return '<option value="' + escapeHtml(nm) + '"' + (nm === cur ? ' selected' : '') + '>' + escapeHtml(nm) + '</option>';
-    }).join('');
-    return '<select class="ref-prov-sel" data-provid="' + escapeHtml(r.id) + '">' + opts + '</select>';
+    return xselHTML(r.id, 'provider', r.provider || '', '— Select —', xOptFlat(refProviderList(), r.provider || ''));
   }
   function setReferralProvider(id, provider) {
     if (dailyData && dailyData.referrals) {
@@ -2968,15 +2999,6 @@
         '</td>' +
       '</tr>';
     }).join('');
-
-    body.querySelectorAll('.ref-prov-sel').forEach(function (sel) {
-      sel.addEventListener('click', function (e) { e.stopPropagation(); });
-      sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
-      sel.addEventListener('change', function (e) {
-        e.stopPropagation();
-        setReferralProvider(sel.getAttribute('data-provid'), sel.value);
-      });
-    });
 
     body.querySelectorAll('.ref-gh-check').forEach(function (chk) {
       chk.addEventListener('click', function (e) { e.stopPropagation(); });
