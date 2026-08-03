@@ -2632,17 +2632,9 @@
   }
 
   function stubOptions() {
-    return {
-      success: true,
-      employees: ['Eduardo Sandez', 'Lilian Perdomo', 'Ercilia Mendoza'],
-      providers: ['Aidee Fabre','Americo Hajaz','Juan Villarroel','Lecia Villames','Leopold Chery','Luis Arocha Yiong','Macmelsie Marrero','Marie Vales-Preval','Oscar Mendez','Victor Francisco'],
-      insuranceTypes: [],
-      plansMap: {},
-      specialties: [],
-      specialtyMap: {},
-      statusList: ['Pending', 'In Progress', 'Completed'],
-      agingThresholdDays: 7
-    };
+    // Use the baked-in DATA (insurance types/plans, specialties, providers, etc.) so the
+    // app is fully functional without a backend.
+    return DATA;
   }
 
   function initEmployeeSelector() {
@@ -2897,6 +2889,27 @@
   function insuranceSelectHTML(r) {
     var cur = r.insurance || '';
     return xselHTML(r.id, 'insurance', cur, 'Select', xOptGroups(REF_INSURANCES, cur));
+  }
+  // Map a Front Desk single insurance value -> the modal's { type, plan } (its group -> type, name kept).
+  function insToTypePlan(ins){
+    if(!ins) return {type:'', plan:''};
+    var g2t={'PPO / Commercial':'PPO/Commercial','Marketplace (ACA)':'Marketplace','Medicare':'Medicare','Medicaid':'Medicaid','Other':'Self-Pay'};
+    for(var i=0;i<REF_INSURANCES.length;i++){ if(REF_INSURANCES[i].items.indexOf(ins)!==-1){ return {type:g2t[REF_INSURANCES[i].g]||'', plan:ins}; } }
+    return {type:'', plan:ins};
+  }
+  // Prefill the modal's Insurance Type + Plan from an imported (Front Desk) insurance; editable after.
+  function applyImportedInsurance(ins){
+    var tp=insToTypePlan(ins); if(!tp.type && !tp.plan) return;
+    var it=$('refFieldInsType');
+    if(!it) return;
+    if(tp.type && !Array.prototype.some.call(it.options, function(o){return o.value===tp.type;})){ var to=document.createElement('option'); to.value=tp.type; to.textContent=tp.type; it.appendChild(to); }
+    it.value=tp.type;
+    populatePlans(tp.type, '');
+    var ip=$('refFieldInsPlan');
+    if(ip && tp.plan){
+      if(!Array.prototype.some.call(ip.options, function(o){return o.value===tp.plan;})){ var po=document.createElement('option'); po.value=tp.plan; po.textContent=tp.plan; ip.appendChild(po); }
+      ip.value=tp.plan;
+    }
   }
   function setReferralProvider(id, provider) {
     if (dailyData && dailyData.referrals) {
@@ -3163,6 +3176,7 @@
 
     fillSelect('refFieldInsType', OPTIONS.insuranceTypes || [], existingRef ? existingRef.insuranceType : '');
     populatePlans(existingRef ? existingRef.insuranceType : '', existingRef ? existingRef.insurancePlan : '');
+    if (existingRef && existingRef.insurance && !existingRef.insuranceType) applyImportedInsurance(existingRef.insurance);
     fillSelect('refFieldProvider', OPTIONS.providers || [], existingRef ? existingRef.provider : '');
 
     const refCountEl = $('refFieldRefCount');
@@ -3213,6 +3227,7 @@
     fdIntake = { id: ref.id, fdId: ref.fdId || '', dobIso: ref.dobIso || '' };
     $('refFieldName').value = ref.patientName || '';
     if (ref.provider) { const pv = $('refFieldProvider'); if (pv) pv.value = ref.provider; }
+    if (ref.insurance) applyImportedInsurance(ref.insurance);
     $('refModalTitle').textContent = 'Referral Intake — ' + formatNameDisplay(ref.patientName);
   }
 
