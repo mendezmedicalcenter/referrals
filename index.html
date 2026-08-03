@@ -2459,12 +2459,11 @@
     }
 
     const fsBtn = $('refFullscreenBtn');
-    function refSetFull(on, silent){
+    function refSetFull(on){
       document.body.classList.toggle('view-fullscreen', on);
-      try{ sessionStorage.setItem('rf_full', on?'1':'0'); }catch(e){}
       const lbl = fsBtn && fsBtn.querySelector('.ref-fs-label');
       if (lbl) { lbl.textContent = on ? 'Exit full screen' : 'Full screen'; }
-      if(!silent){ try{ window.parent.postMessage({type:'queue-fullscreen', app:'referrals', full:on}, '*'); }catch(e){} }
+      try{ window.parent.postMessage({type:'queue-fullscreen', app:'referrals', full:on}, '*'); }catch(e){}
     }
     if (fsBtn) {
       fsBtn.addEventListener('click', function () {
@@ -2474,8 +2473,6 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && document.body.classList.contains('view-fullscreen')) { refSetFull(false); }
     });
-    // Restore full-screen after a reload (e.g. host remounts the iframe when expanding it) so it's a single click.
-    try{ if(sessionStorage.getItem('rf_full')==='1'){ refSetFull(true, true); } }catch(e){}
 
     initReferralModal();
     initDeleteModal();
