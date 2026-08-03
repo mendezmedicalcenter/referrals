@@ -866,9 +866,10 @@
   .ref-prov-sel:focus { outline: none; border-color: #1d5bbf; box-shadow: 0 0 0 3px rgba(29,91,191,.13); }
 
   .ref-table tbody tr {
-    cursor: pointer;
     transition: background 0.1s;
   }
+  .ref-table tbody td.ref-refcell { cursor: pointer; }
+  .ref-table tbody td.ref-refcell:hover .ref-num-chip { box-shadow: 0 0 0 2px rgba(31,76,199,0.25); }
 
   .ref-table tbody tr:hover { background: var(--panel-2); }
 
@@ -2824,7 +2825,7 @@
         '<td class="ref-td-time">' + escapeHtml(r.time || '') + '</td>' +
         '<td class="ref-td-wait">' + waitCell + '</td>' +
         '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
-        '<td>' + refChip + '</td>' +
+        '<td class="ref-refcell" title="Edit referral">' + refChip + '</td>' +
         '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
         '<td>' + ghCell + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
@@ -2934,6 +2935,7 @@
 
       const REF_BACK = '<button class="ref-action-btn ref-back-btn" title="Move back" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6 L4 11 L9 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 11 H14 A6 6 0 0 1 20 17 V19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
       const REF_TRASH = '<button class="ref-icon-btn is-danger ref-del-btn" title="Delete" type="button"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 7 H19 M9 7 V4 H15 V7 M7 7 V20 H17 V7 M10 11 V17 M14 11 V17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      const REF_EDIT = '<button class="ref-icon-btn ref-edit-btn" title="Edit referral" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>';
       const refPrimary = isFdIntake(r) ? '<button class="ref-action-btn is-primary ref-fdstart-btn" type="button">Start</button>'
         : (r.status === 'Pending' ? '<button class="ref-action-btn is-primary ref-start-btn" type="button">Start</button>'
         : (r.status === 'In Progress' ? '<button class="ref-action-btn is-primary ref-complete-btn" type="button">Complete</button>' : ''));
@@ -2944,7 +2946,7 @@
         '<td class="ref-td-time">' + escapeHtml(r.time || '') + '</td>' +
         '<td class="ref-td-wait">' + waitCell + '</td>' +
         '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
-        '<td>' + refChip + '</td>' +
+        '<td class="ref-refcell" title="Edit referral">' + refChip + '</td>' +
         '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
         '<td>' + providerSelectHTML(r) + '</td>' +
@@ -2960,8 +2962,8 @@
           (refPrimary
             ? ('<span class="ref-act-left">' + refBack + '</span>' +
                '<span class="ref-act-mid">' + refPrimary + '</span>' +
-               '<span class="ref-act-right">' + REF_TRASH + '</span>')
-            : (refBack + REF_TRASH)) +
+               '<span class="ref-act-right">' + REF_EDIT + REF_TRASH + '</span>')
+            : (refBack + REF_EDIT + REF_TRASH)) +
         '</td>' +
       '</tr>';
     }).join('');
@@ -3031,11 +3033,10 @@
         if (ref) openDeleteModal(ref);
       });
     });
-    body.querySelectorAll('tr[data-id]').forEach(function (tr) {
-      tr.addEventListener('click', function (e) {
-        if (e.target.closest('.ref-action-btn')) return;
-        if (e.target.closest('.ref-icon-btn')) return;
-        const id = tr.getAttribute('data-id');
+    body.querySelectorAll('.ref-refcell').forEach(function (cell) {
+      cell.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const id = cell.closest('tr').getAttribute('data-id');
         const ref = (dailyData.referrals || []).filter(function (x) { return x.id === id; })[0];
         if (ref && isFdIntake(ref)) openFdIntake(id); else openReferralModalForId(id);
       });
