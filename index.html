@@ -2887,7 +2887,7 @@
   ];
   function xOptGroups(groups,val){ return groups.map(function(gr){ return '<div class="xsel-grp">'+escapeHtml(gr.g)+'</div>'+gr.items.map(function(n){ return '<div class="xsel-opt'+(val===n?' sel':'')+'" data-v="'+escapeHtml(n)+'">'+escapeHtml(n)+'</div>'; }).join(''); }).join(''); }
   function insuranceSelectHTML(r) {
-    var cur = r.insurance || '';
+    var cur = r.insurance || r.insurancePlan || '';
     return xselHTML(r.id, 'insurance', cur, 'Select', xOptGroups(REF_INSURANCES, cur));
   }
   // Map a Front Desk single insurance value -> the modal's { type, plan } (its group -> type, name kept).
@@ -2923,13 +2923,14 @@
     } catch (e) {}
   }
   function setReferralInsurance(id, insurance) {
+    var tp = insToTypePlan(insurance);
     if (dailyData && dailyData.referrals) {
-      dailyData.referrals.forEach(function (r) { if (r.id === id) r.insurance = insurance; });
+      dailyData.referrals.forEach(function (r) { if (r.id === id) { r.insurance = insurance; r.insurancePlan = insurance; r.insuranceType = tp.type; } });
     }
     try {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {})
-          .updateReferral({ id: id, updatedBy: (typeof currentEmployee !== 'undefined' ? currentEmployee : '') || '', fields: { insurance: insurance } });
+          .updateReferral({ id: id, updatedBy: (typeof currentEmployee !== 'undefined' ? currentEmployee : '') || '', fields: { insurance: insurance, insurancePlan: insurance, insuranceType: tp.type } });
       }
     } catch (e) {}
   }
