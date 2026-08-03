@@ -849,6 +849,22 @@
 
   .ref-table tbody tr:last-child td { border-bottom: 0; }
 
+  /* Inline editable Provider dropdown — same pill style as Front Desk / Pharmacy */
+  .ref-prov-sel {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    border: 1px solid #e2e9f3; border-radius: 9px;
+    padding: 6px 26px 6px 14px;
+    font-size: 12.5px; font-weight: 600; color: #123a70;
+    background-color: #f5f8fd;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23123a70' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 9px center;
+    cursor: pointer; text-align: center; text-align-last: center;
+    min-width: 130px; max-width: 100%; box-sizing: border-box;
+    transition: border-color .15s, background-color .15s, box-shadow .15s;
+  }
+  .ref-prov-sel:hover { background-color: #eef3fb; border-color: #cdd9ec; }
+  .ref-prov-sel:focus { outline: none; border-color: #1d5bbf; box-shadow: 0 0 0 3px rgba(29,91,191,.13); }
+
   .ref-table tbody tr {
     cursor: pointer;
     transition: background 0.1s;
@@ -2591,7 +2607,7 @@
     return {
       success: true,
       employees: ['Eduardo Sandez', 'Lilian Perdomo', 'Ercilia Mendoza'],
-      providers: [],
+      providers: ['Aidee Fabre','Americo Hajaz','Juan Villarroel','Lecia Villames','Leopold Chery','Luis Arocha Yiong','Macmelsie Marrero','Marie Vales-Preval','Oscar Mendez','Victor Francisco'],
       insuranceTypes: [],
       plansMap: {},
       specialties: [],
@@ -2824,6 +2840,30 @@
     }).join('');
   }
 
+  function refProviderList() {
+    return (typeof OPTIONS !== 'undefined' && OPTIONS && OPTIONS.providers && OPTIONS.providers.length)
+      ? OPTIONS.providers
+      : ['Aidee Fabre','Americo Hajaz','Juan Villarroel','Lecia Villames','Leopold Chery','Luis Arocha Yiong','Macmelsie Marrero','Marie Vales-Preval','Oscar Mendez','Victor Francisco'];
+  }
+  function providerSelectHTML(r) {
+    var cur = r.provider || '';
+    var opts = '<option value="">— Select —</option>' + refProviderList().map(function (nm) {
+      return '<option value="' + escapeHtml(nm) + '"' + (nm === cur ? ' selected' : '') + '>' + escapeHtml(nm) + '</option>';
+    }).join('');
+    return '<select class="ref-prov-sel" data-provid="' + escapeHtml(r.id) + '">' + opts + '</select>';
+  }
+  function setReferralProvider(id, provider) {
+    if (dailyData && dailyData.referrals) {
+      dailyData.referrals.forEach(function (r) { if (r.id === id) r.provider = provider; });
+    }
+    try {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {})
+          .updateReferral({ id: id, updatedBy: (typeof currentEmployee !== 'undefined' ? currentEmployee : '') || '', fields: { provider: provider } });
+      }
+    } catch (e) {}
+  }
+
   function renderDailyTable() {
     const body = $('refDailyBody');
     if (!dailyData) return;
@@ -2896,7 +2936,7 @@
         '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
         '<td>' + ghCell + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
-        '<td>' + escapeHtml(r.provider || '—') + '</td>' +
+        '<td>' + providerSelectHTML(r) + '</td>' +
         '<td>' + escapeHtml(r.specialty || '—') + '</td>' +
         '<td>' + escapeHtml(r.subspecialty || '—') + '</td>' +
         '<td>' +
@@ -2913,6 +2953,15 @@
         '</td>' +
       '</tr>';
     }).join('');
+
+    body.querySelectorAll('.ref-prov-sel').forEach(function (sel) {
+      sel.addEventListener('click', function (e) { e.stopPropagation(); });
+      sel.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+      sel.addEventListener('change', function (e) {
+        e.stopPropagation();
+        setReferralProvider(sel.getAttribute('data-provid'), sel.value);
+      });
+    });
 
     body.querySelectorAll('.ref-start-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
