@@ -2103,11 +2103,11 @@
                   <th>By</th>
                   <th># Ref</th>
                   <th>Patient</th>
-                  <th>GH</th>
                   <th>Insurance</th>
                   <th>Provider</th>
                   <th>Specialty</th>
                   <th>Subspecialty</th>
+                  <th>GH</th>
                   <th>Status</th>
                   <th class="ref-th-action">Actions</th>
                 </tr>
@@ -2864,6 +2864,18 @@
     } catch (e) {}
   }
 
+  function setReferralGroupHome(id, on) {
+    if (dailyData && dailyData.referrals) {
+      dailyData.referrals.forEach(function (r) { if (r.id === id) r.groupHome = on; });
+    }
+    try {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {})
+          .updateReferral({ id: id, updatedBy: (typeof currentEmployee !== 'undefined' ? currentEmployee : '') || '', fields: { groupHome: on } });
+      }
+    } catch (e) {}
+  }
+
   function renderDailyTable() {
     const body = $('refDailyBody');
     if (!dailyData) return;
@@ -2934,11 +2946,11 @@
         '<td>' + escapeHtml(r.submittedBy || '') + '</td>' +
         '<td>' + refChip + '</td>' +
         '<td class="ref-td-name">' + indent + escapeHtml((r.patientName || "").toUpperCase()) + (r.fdId ? ' <span class="ref-fdtag" title="Sent from Front Desk">↪ FD</span>' : '') + (r.dobIso ? '<div class="ref-dob">DOB ' + escapeHtml(fmtDobShort(r.dobIso)) + '</div>' : '') + '</td>' +
-        '<td>' + ghCell + '</td>' +
         '<td>' + escapeHtml(ins) + '</td>' +
         '<td>' + providerSelectHTML(r) + '</td>' +
         '<td>' + escapeHtml(r.specialty || '—') + '</td>' +
         '<td>' + escapeHtml(r.subspecialty || '—') + '</td>' +
+        '<td><input type="checkbox" class="ref-gh-check" data-ghid="' + escapeHtml(r.id) + '"' + (r.groupHome ? ' checked' : '') + '></td>' +
         '<td>' +
           '<span class="ref-status-pill ' + statusClass(isFdIntake(r) ? 'Pending' : r.status) + '">' +
             escapeHtml(isFdIntake(r) ? 'Pending' : r.status) +
@@ -2960,6 +2972,14 @@
       sel.addEventListener('change', function (e) {
         e.stopPropagation();
         setReferralProvider(sel.getAttribute('data-provid'), sel.value);
+      });
+    });
+
+    body.querySelectorAll('.ref-gh-check').forEach(function (chk) {
+      chk.addEventListener('click', function (e) { e.stopPropagation(); });
+      chk.addEventListener('change', function (e) {
+        e.stopPropagation();
+        setReferralGroupHome(chk.getAttribute('data-ghid'), chk.checked);
       });
     });
 
