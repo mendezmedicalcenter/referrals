@@ -1253,7 +1253,8 @@
   body.view-fullscreen .ref-sidebar { display: none; }
   body.view-fullscreen .ref-header { display: none; }
   body.view-fullscreen .ref-app { grid-template-columns: 1fr; }
-  body.view-fullscreen .ref-main { padding: 16px 24px; }
+  body.view-fullscreen .ref-main,
+  body.embed.view-fullscreen .ref-main { padding: 0; }
   /* Embedded in the portal: hide our own sidebar (the portal already has one). */
   body.embed .ref-sidebar { display: none; }
   body.embed .ref-app { grid-template-columns: 1fr; }
@@ -2458,17 +2459,20 @@
     }
 
     const fsBtn = $('refFullscreenBtn');
+    function refSetFull(on){
+      document.body.classList.toggle('view-fullscreen', on);
+      const lbl = fsBtn && fsBtn.querySelector('.ref-fs-label');
+      if (lbl) { lbl.textContent = on ? 'Exit full screen' : 'Full screen'; }
+      try{ window.parent.postMessage({type:'queue-fullscreen', app:'referrals', full:on}, '*'); }catch(e){}
+    }
     if (fsBtn) {
       fsBtn.addEventListener('click', function () {
-        document.body.classList.toggle('view-fullscreen');
-        const lbl = fsBtn.querySelector('.ref-fs-label');
-        if (lbl) {
-          lbl.textContent = document.body.classList.contains('view-fullscreen')
-            ? 'Exit full screen'
-            : 'Full screen';
-        }
+        refSetFull(!document.body.classList.contains('view-fullscreen'));
       });
     }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && document.body.classList.contains('view-fullscreen')) { refSetFull(false); }
+    });
 
     initReferralModal();
     initDeleteModal();
