@@ -2883,7 +2883,7 @@
   function closeAllXsel(){ var m=document.querySelectorAll('.xsel-menu'); for(var i=0;i<m.length;i++) m[i].hidden=true; var b=document.querySelectorAll('.xsel.open'); for(var j=0;j<b.length;j++) b[j].classList.remove('open'); }
   function openXsel(box){ closeAllXsel(); var menu=box.querySelector('.xsel-menu'); if(!menu) return; var r=box.getBoundingClientRect(); menu.style.minWidth=r.width+'px'; menu.style.maxHeight='none'; menu.hidden=false; box.classList.add('open'); var mw=menu.offsetWidth, natural=menu.scrollHeight; var below=window.innerHeight-r.bottom-12, above=r.top-12; var up=(below<120)&&(above>below+40); var avail=up?above:below; var h=Math.min(natural,Math.max(120,avail)); menu.style.maxHeight=h+'px'; menu.style.top=(up?(r.top-4-h):(r.bottom+4))+'px'; var left=r.left+r.width/2-mw/2; if(left<6) left=6; if(left+mw>window.innerWidth-6) left=window.innerWidth-6-mw; menu.style.left=left+'px'; var s=menu.querySelector('.xsel-opt.sel'); if(s) s.scrollIntoView({block:'nearest'}); }
   function providerSelectHTML(r) {
-    return xselHTML(r.id, 'provider', r.provider || '', '— Select —', xOptFlat(refProviderList(), r.provider || ''));
+    return xselHTML(r.id, 'provider', r.provider || '', 'Select', xOptFlat(refProviderList(), r.provider || ''));
   }
   function setReferralProvider(id, provider) {
     if (dailyData && dailyData.referrals) {
